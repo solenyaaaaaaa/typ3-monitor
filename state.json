@@ -1,0 +1,577 @@
+{
+  "sites": {
+    "typ3": {
+      "products": {
+        "typ3-hoodie": {
+          "handle": "typ3-hoodie",
+          "title": "TYP3 Hoodie",
+          "price": "$54.99\u2013$56.99",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-07T08:04:36.174052+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "typ3-logo-tee": {
+          "handle": "typ3-logo-tee",
+          "title": "TYP3 Logo Tee",
+          "price": "$24.99\u2013$26.99",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-07T08:04:36.174052+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "dark-seeker-1-s1": {
+          "handle": "dark-seeker-1-s1",
+          "title": "Dark Seeker #1 - s1",
+          "price": "$20.00\u2013$75.00",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-06T04:57:02.856758+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "typ3-unisex-t-shirt": {
+          "handle": "typ3-unisex-t-shirt",
+          "title": "TYP3 Unisex T-Shirt",
+          "price": "$38.00\u2013$40.00",
+          "sold_out": false,
+          "made_to_order": true,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "typ3-pullover-hoodie": {
+          "handle": "typ3-pullover-hoodie",
+          "title": "TYP3 Pullover Hoodie",
+          "price": "$38.00",
+          "sold_out": false,
+          "made_to_order": true,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "typ3-canvas-tote-bag": {
+          "handle": "typ3-canvas-tote-bag",
+          "title": "TYP3 Canvas Tote Bag",
+          "price": "$38.00",
+          "sold_out": false,
+          "made_to_order": true,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "typ3-sticker-sheet": {
+          "handle": "typ3-sticker-sheet",
+          "title": "TYP3 Sticker Sheet",
+          "price": "$8.00",
+          "sold_out": false,
+          "made_to_order": true,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "dos-octane-41": {
+          "handle": "dos-octane-41",
+          "title": "Dos Octane #41",
+          "price": "$20.00\u2013$75.00",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "dark-octane-85": {
+          "handle": "dark-octane-85",
+          "title": "Dark Octane #85",
+          "price": "$20.00\u2013$75.00",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "dark-octane-23": {
+          "handle": "dark-octane-23",
+          "title": "Dark Octane #23",
+          "price": "$20.00\u2013$75.00",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "test-payment": {
+          "handle": "test-payment",
+          "title": "Test Payment \u2014 $1.00",
+          "price": "$1.00",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "grandseeker-og-type-2": {
+          "handle": "grandseeker-og-type-2",
+          "title": "GrandSeeker OG TYPE 2",
+          "price": "$20.00\u2013$75.00",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "bluezeeker-1": {
+          "handle": "bluezeeker-1",
+          "title": "BlueZeeker #1",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "abagluez-type-2-3": {
+          "handle": "abagluez-type-2-3",
+          "title": "AbaglueZ TYPE 2 &amp; 3",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-06T05:07:02.578529+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "typ3-dad-hat": {
+          "handle": "typ3-dad-hat",
+          "title": "TYP3 Dad Hat",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": true,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "stainless-steel-water-bottle-with-a-straw-lid": {
+          "handle": "stainless-steel-water-bottle-with-a-straw-lid",
+          "title": "Stainless steel water bottle with a straw lid",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": true,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "mug-with-color-inside": {
+          "handle": "mug-with-color-inside",
+          "title": "Mug with Color Inside",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": true,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "vintage-corduroy-cap": {
+          "handle": "vintage-corduroy-cap",
+          "title": "vintage-corduroy-cap",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "trucker-cap": {
+          "handle": "trucker-cap",
+          "title": "trucker-cap",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": true,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "embroidered-patches": {
+          "handle": "embroidered-patches",
+          "title": "Embroidered patches",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": true,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "snapback-hat": {
+          "handle": "snapback-hat",
+          "title": "snapback-hat",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "blue-brulee": {
+          "handle": "blue-brulee",
+          "title": "Blue Br\u00fbl\u00e9e",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "2dark": {
+          "handle": "2dark",
+          "title": "2Dark",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "bluezerry": {
+          "handle": "bluezerry",
+          "title": "BlueZerry s1 Rusko Cut",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "muscle-shirt": {
+          "handle": "muscle-shirt",
+          "title": "Muscle Shirt",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": true,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "pom-pom-beanie": {
+          "handle": "pom-pom-beanie",
+          "title": "pom-pom-beanie",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "bluezerry-honey": {
+          "handle": "bluezerry-honey",
+          "title": "BlueZerry Infused Honey",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "marshmellow-og-tincture": {
+          "handle": "marshmellow-og-tincture",
+          "title": "Marshmellow OG Rosin Tincture",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "june-plum-chocolate": {
+          "handle": "june-plum-chocolate",
+          "title": "June Plum Chocolate Bar",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "bruntz-gummies": {
+          "handle": "bruntz-gummies",
+          "title": "Black Runtz Gummies",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "tropruntz-gummies": {
+          "handle": "tropruntz-gummies",
+          "title": "TropRuntz Gummies",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "permanent-marker-rosin": {
+          "handle": "permanent-marker-rosin",
+          "title": "Permanent Marker Rosin",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "truffle-monkey-rosin": {
+          "handle": "truffle-monkey-rosin",
+          "title": "Truffle Monkey Rosin",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "bluezerry-live-resin": {
+          "handle": "bluezerry-live-resin",
+          "title": "BlueZerry Live Resin",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "marshmellow-og-live-resin": {
+          "handle": "marshmellow-og-live-resin",
+          "title": "Marshmellow OG Live Resin",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "june-plum-disposable": {
+          "handle": "june-plum-disposable",
+          "title": "June Plum Disposable",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "bluezeeker-7": {
+          "handle": "bluezeeker-7",
+          "title": "BlueZeeker #7",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-06T05:07:02.578529+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "darkblue": {
+          "handle": "darkblue",
+          "title": "DarkBlue",
+          "price": "",
+          "sold_out": false,
+          "made_to_order": false,
+          "first_seen": "2026-05-06T05:07:02.578529+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "bruntz-disposable": {
+          "handle": "bruntz-disposable",
+          "title": "Black Runtz Disposable",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "tropruntz-510-cart": {
+          "handle": "tropruntz-510-cart",
+          "title": "TropRuntz 510 Live Resin Cart",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        },
+        "permanent-marker-510-cart": {
+          "handle": "permanent-marker-510-cart",
+          "title": "Permanent Marker 510 Live Resin Cart",
+          "price": "",
+          "sold_out": true,
+          "made_to_order": false,
+          "first_seen": "2026-05-05T16:24:41.305324+00:00",
+          "last_seen": "2026-05-08T20:15:38.358875+00:00"
+        }
+      }
+    },
+    "hempbarn_livingsoil": {
+      "strains": [
+        "Don Mega",
+        "RS54",
+        "Sherb Stack",
+        "Tahiti Twist"
+      ],
+      "descriptions": {
+        "RS54": "This smells like a creamy version of Zkittlez to me. It has that \u201csweet zkittlez\u201d smell but with an extra creamy twist to it. Nice middle of the road hybrid effects.",
+        "Sherb Stack": "Unreal bag appeal with that unmistakable funky, yet gassy Sherb profile. It definitely leans on the Sunset Sherbet side of the cross with potent, slightly indica leaning effects.",
+        "Tahiti Twist": "The Tahiti twist is back! Amazing nose on this \u2013 it smells like tropical scented bubblegum to me. Nice anytime of day Sativa dominant effects.",
+        "Don Mega": "We usually do organic soil runs of this since it can be really finicky, but this batch might be the best one yet. Reeks of GMO and old school Kush/OG with Indica dominant effects."
+      },
+      "last_seen": "2026-05-08T20:15:38.581032+00:00"
+    },
+    "caregiverpharms": {
+      "products": {
+        "blueberry-chem-23-chem-dominant-pheno-thca-flower": {
+          "title": "Blueberry Chem #23 (Chem Dominant Pheno) THCa Flower",
+          "any_available": true,
+          "smalls_present": true,
+          "smalls_available": false
+        },
+        "blueberry-chem-7-blueberry-pheno-thca-flower": {
+          "title": "Blueberry Chem #7 (Blueberry Dominant Pheno) THCa Flower",
+          "any_available": true,
+          "smalls_present": true,
+          "smalls_available": false
+        },
+        "dreamcatcher-thca-flower": {
+          "title": "Dreamcatcher THCa Flower",
+          "any_available": true,
+          "smalls_present": true,
+          "smalls_available": false
+        },
+        "copper-chem-thca-flower": {
+          "title": "Copper Chem THCa Flower",
+          "any_available": true,
+          "smalls_present": true,
+          "smalls_available": false
+        },
+        "tricho-jordan-thca-flower": {
+          "title": "Tricho Jordan THCa Flower",
+          "any_available": false,
+          "smalls_present": true,
+          "smalls_available": false
+        },
+        "ghost-town-thca-flower": {
+          "title": "Ghost Town THCa Flower",
+          "any_available": true,
+          "smalls_present": true,
+          "smalls_available": false
+        },
+        "insulin-shock-thca-flower": {
+          "title": "Insulin Shock THCa Flower",
+          "any_available": false,
+          "smalls_present": true,
+          "smalls_available": false
+        },
+        "hawaiian-unicorn-thca-flower": {
+          "title": "Hawaiian Unicorn THCa Flower",
+          "any_available": false,
+          "smalls_present": true,
+          "smalls_available": false
+        }
+      },
+      "last_seen": "2026-05-08T20:15:38.969989+00:00"
+    },
+    "flowgardens_smalls": {
+      "strains": [
+        "Applesauce - Type 3 (CBD)",
+        "Black Baccara - Type 1 (THCa)",
+        "Black Maple - Type 1 (THCa)",
+        "Blue Lobster - Type 1 (THCa)",
+        "Coolio - Type 1 (THCa)",
+        "Durban Poison - Type 1 (THCa)",
+        "Frosted Pines - Type 2 (THCa:CBD)",
+        "GG4 - Type 1 (THCa)",
+        "Gelato Cake - Type 1 (THCa)",
+        "Grapefruit - Type 3 (CBD)",
+        "Green Crack - Type 1 (THCa)",
+        "Legendary Platinum OG - Type 3 (CBD)",
+        "Lemon Skunk - Type 1 (THCa)",
+        "Paradise OG - Type 3 (CBD)",
+        "Peyton's Strawberries - Type 3 (CBD)",
+        "Skunk Jam - Type 3 (CBD)",
+        "Sunset Spice - Type 1 (THCa)",
+        "Swizzler's- Type 3 (CBD)",
+        "Swizzlers- Type 3 (CBD)",
+        "White Cheddar - Type 4 (CBG)",
+        "Wizard of OZ - Type 3 (CBD)"
+      ],
+      "last_seen": "2026-05-08T20:15:39.195538+00:00"
+    },
+    "hempbarn_organicsoil": {
+      "strains": [
+        "Airheadz",
+        "Biscotti Pancakes",
+        "Blue Sherbet",
+        "Bogglegum",
+        "Cherry Marker",
+        "Coffin Candy",
+        "Dog Star Blue Axis",
+        "Eye Candy",
+        "Lemon Cherry Gelato",
+        "Neon",
+        "Silky Gelato",
+        "Tamalez"
+      ],
+      "descriptions": {
+        "Neon": "Interesting nose on this. It has this funky truffle/GMO profile going on with some sweetness in the background. Potent Indica leaning effects.",
+        "Eye Candy": "This has that creamy, yet gassy biscotti smell but with an extra sweet kushy twist from the Menthol. Potent Indica leaning effects.",
+        "Biscotti Pancakes": "Interesting nose on this. It kind of has this sweet GMO funk going on with a creamy vanilla like undertones. Potent Indica leaning effects.",
+        "Silky Gelato": "Classic Gelato smell but with just a hint of gassy pine terps in there. I\u2019m not personally a huge gelato fan but I\u2019ve been enjoying this one. Nice middle of the road hybrid effects.",
+        "Tamalez": "Complex nose on this. It smells like a more sweet/creamy version of Presidential OG. You can still smell the Runtz, but it leans more heavy on the sweet, creamy kush side with potent indica leaning effects.",
+        "Airheadz": "This just reeks of Runtz. If you love that Runtz smell you should love this. Potent middle of the road hybrid effects.",
+        "Blue Sherbet": "Interesting nose on this. It has some of that gassy sherb funk going on but with a sweet creamy kush thing going on as well. Indica dominant effects.",
+        "Cherry Marker": "Strong nose on this, it actually smells like a cherry scented permanent marker. The cherry from the LCG really comes through with a strong \u201cpermanent marker\u201d funk going on as well with indica leaning hybrid effects.",
+        "Dog Star Blue Axis": "Straight old school Chem right here. This is a special breeding project by Blue Star Seed Co \u2013 \u201cDog Star is a focused exploration of Blueberry lineage meeting raw Chem 91 fuel, created as a true reciprocal pairing to examine maternal influence and terpene dominance. The Blue Axis tends to express brighter, sharper top notes \u2014 sour lime, sulfurous diesel, and penetrating fuel layered over dark berry undertones. This smoked like a potent Sativa to me, being a bit racy at times.",
+        "Coffin Candy": "10/10 nose on this. Not the prettiest but this just reeks like Runtz with a skunk like twist to it. Super potent Indica dominant effects, this really put me out for the night.",
+        "Bogglegum": "Another old school classic in my opinion. I first started running BOG seeds way back in the early 2000\u2019s when he would drop them on overgrow/ICMag so there is a lot of nostalgia with this strain for me. This is my favorite bubblegum strain \u2013 it smells like big league chew bubblegum with a hint of fresh hops with nice middle of the road hybrid effects that run slightly on the Indica side."
+      },
+      "last_seen": "2026-05-08T20:15:38.653787+00:00"
+    },
+    "fiveleafwellness": {
+      "products": {
+        "https://fiveleafwellness.com/product/chillax-by-nicks-nugs-10mg-d9-20mg-cbd/": {
+          "slug": "chillax-by-nicks-nugs-10mg-d9-20mg-cbd",
+          "url": "https://fiveleafwellness.com/product/chillax-by-nicks-nugs-10mg-d9-20mg-cbd/"
+        },
+        "https://fiveleafwellness.com/product/shabazz-x-five-leaf-apparel/": {
+          "slug": "shabazz-x-five-leaf-apparel",
+          "url": "https://fiveleafwellness.com/product/shabazz-x-five-leaf-apparel/"
+        },
+        "https://fiveleafwellness.com/product/modern-herb-indica-gummy-5-pack/": {
+          "slug": "modern-herb-indica-gummy-5-pack",
+          "url": "https://fiveleafwellness.com/product/modern-herb-indica-gummy-5-pack/"
+        },
+        "https://fiveleafwellness.com/product/wildwood-thca-pre-roll-sativa/": {
+          "slug": "wildwood-thca-pre-roll-sativa",
+          "url": "https://fiveleafwellness.com/product/wildwood-thca-pre-roll-sativa/"
+        },
+        "https://fiveleafwellness.com/product/wildwood-live-resin-vapes/": {
+          "slug": "wildwood-live-resin-vapes",
+          "url": "https://fiveleafwellness.com/product/wildwood-live-resin-vapes/"
+        },
+        "https://fiveleafwellness.com/product/nicks-nugs-the-og-10mgd9-75mgcbd/": {
+          "slug": "nicks-nugs-the-og-10mgd9-75mgcbd",
+          "url": "https://fiveleafwellness.com/product/nicks-nugs-the-og-10mgd9-75mgcbd/"
+        },
+        "https://fiveleafwellness.com/product/gelato-king-indoor-indica-hybrid/": {
+          "slug": "gelato-king-indoor-indica-hybrid",
+          "url": "https://fiveleafwellness.com/product/gelato-king-indoor-indica-hybrid/"
+        },
+        "https://fiveleafwellness.com/product/modern-herb-sativa-gummy-5-pack/": {
+          "slug": "modern-herb-sativa-gummy-5-pack",
+          "url": "https://fiveleafwellness.com/product/modern-herb-sativa-gummy-5-pack/"
+        },
+        "https://fiveleafwellness.com/product/wildwood-thca-live-resin-core-infused-pre-roll-5ct/": {
+          "slug": "wildwood-thca-live-resin-core-infused-pre-roll-5ct",
+          "url": "https://fiveleafwellness.com/product/wildwood-thca-live-resin-core-infused-pre-roll-5ct/"
+        },
+        "https://fiveleafwellness.com/product/vampire-slayer-disposable-indica/": {
+          "slug": "vampire-slayer-disposable-indica",
+          "matched_kw": null,
+          "checked": true
+        },
+        "https://fiveleafwellness.com/product/wildwood-live-resin-gummies/": {
+          "slug": "wildwood-live-resin-gummies",
+          "url": "https://fiveleafwellness.com/product/wildwood-live-resin-gummies/"
+        },
+        "https://fiveleafwellness.com/product/moon-konez/": {
+          "slug": "moon-konez",
+          "url": "https://fiveleafwellness.com/product/moon-konez/"
+        },
+        "https://fiveleafwellness.com/product/hemp-rolls/": {
+          "slug": "hemp-rolls",
+          "url": "https://fiveleafwellness.com/product/hemp-rolls/"
+        },
+        "https://fiveleafwellness.com/product/five-leaf-t-shirts/": {
+          "slug": "five-leaf-t-shirts",
+          "url": "https://fiveleafwellness.com/product/five-leaf-t-shirts/"
+        },
+        "https://fiveleafwellness.com/product/nickss-nugs-code-red-gummies-max-potency-25mg-d9-75mg-cbd/": {
+          "slug": "nickss-nugs-code-red-gummies-max-potency-25mg-d9-75mg-cbd",
+          "url": "https://fiveleafwellness.com/product/nickss-nugs-code-red-gummies-max-potency-25mg-d9-75mg-cbd/"
+        },
+        "https://fiveleafwellness.com/product/super-boof-indoor-hybrid-2/": {
+          "slug": "super-boof-indoor-hybrid-2",
+          "matched_kw": "top shelf",
+          "checked": true
+        }
+      },
+      "last_seen": "2026-05-08T20:15:42.479141+00:00"
+    },
+    "beleafer_indoor": {
+      "products": {},
+      "last_seen": "2026-05-08T20:15:43.032415+00:00"
+    }
+  },
+  "last_run": "2026-05-08T20:15:44.398965+00:00"
+}

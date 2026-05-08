@@ -1,0 +1,5 @@
+monitor.log
+__pycache__/
+*.pyc
+.scratch/
+secrets.json

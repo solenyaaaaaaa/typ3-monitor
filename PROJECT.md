@@ -1,0 +1,110 @@
+# typ3-monitor (multi-site drop monitor)
+
+Polls a configured list of cannabis storefronts every 5 minutes via GitHub Actions and emails on drops, restocks, and new variant options.
+
+## Status — 2026-05-06
+
+- **Multi-site, 5 sites monitored** (config in `config.json`):
+  1. **TYP3 Cannabis** (`typ3cannabis.com/store`) — alerts on new product drops and restocks; ignores known merch.
+  2. **Hemp Barn — Living Soil** (`thehempbarn.com/product/livingsoil/`) — alerts only on **new strains** whose section of the product short-description contains `special` or `all time` (case-insensitive). Other new strains are silently logged.
+  3. **Hemp Barn — Organic Soil** (`thehempbarn.com/product/organicsoil/`) — same rule as Living Soil: only new strains with `special` or `all time` in the description.
+  4. **Caregiver Pharms** (`caregiverpharms.com/collections/all`) — alerts on new product handles, on products going from all-sold-out → any-variant-available, and on a "Smalls/Micros" variant becoming available on any product.
+  5. **Flow Gardens — Smalls** (`flowgardens.com/products/smalls`) — alerts only when a **new Type 2** strain is added to the dropdown (parsed from the strain name's "Type N" suffix). Type 1 / Type 3 / Type 4 / Type 5+ additions are silently logged. Configurable via `flowgardens_smalls.allowed_types` (currently `[2]`).
+  6. **Five Leaf Wellness** (`fiveleafwellness.com/shop/`) — alerts only when a new product appears AND its **product detail page** contains `top shelf` or `top tier` somewhere in the title, long description, or category list. Site-wide nav (which has "Top Shelf" / "Mid Tier" category links) is excluded from the scan.
+  7. **Beleafer — Indoor Hemp Flower** (`beleafer.com/product-category/hemp-flower/indoor/`) — alerts only when a new product appears AND its **product summary block** contains a "Type 2" designation. Type detection uses `\btype\s*N\b` regex; the scan is scoped to the WooCommerce `product-summary` block so the site's `blfr.type3` Instagram link in the footer does not false-match. Configurable via `beleafer_indoor.allowed_types`.
+- Cloud workflow runs every 5 min on a fresh Ubuntu runner; commits updated `state.json` back to `main`. Verified green after the multi-site upgrade.
+- Local Windows scheduled task: **disabled** (still registered) so cloud is the only sender.
+- Email: aggregated, one per run, sectioned by site. Subject prefix `[Drop Monitor]`.
+
+## How it works
+
+`monitor.py` runs through each enabled site once per invocation:
+
+1. **Fetch** site-specific snapshot (HTML scrape for TYP3 + Hemp Barn; Shopify `/products.json` for Caregiver Pharms and Flow Gardens).
+2. **Diff** against the previous snapshot stored under `state.sites.{site_name}` in `state.json`.
+3. Each adapter emits zero or more typed alerts:
+   - `DROP` — TYP3 new in-stock product
+   - `RESTOCK` — TYP3 / Caregiver previously unavailable → available
+   - `NEW_PRODUCT` — Caregiver new product handle
+   - `NEW_STRAIN` — Hemp Barn / Flow Gardens new strain option
+   - `SMALLS_BACK` — Caregiver smalls/micros variant going from missing-or-unavailable → available
+4. After all sites run, alerts are aggregated into **one email** with a section per site. On Windows it also fires a toast + beep + browser tab per alert.
+5. State is saved atomically. First run for any site only seeds — never alerts.
+6. One site's failure (network blip, parse error) is logged but does not stop other sites from running.
+
+## Files
+
+- `monitor.py` — main script
+- `config.json` — user-editable settings (URL, ignore list, alert toggles, email recipient)
+- `state.json` — catalog snapshot (created on first run; do not edit by hand)
+- `monitor.log` — append-only run log
+- `run.bat` — manual runner (uses `python.exe` so console output is visible)
+- `requirements.txt` — `requests`, `winotify`
+- `%APPDATA%\typ3-monitor\secrets.json` — SMTP credentials (Gmail App Password). Outside the project folder so it does not get synced by OneDrive.
+
+## Cloud schedule (active)
+
+- Repo: `solenyaaaaaaa/typ3-monitor` (private)
+- Workflow: `.github/workflows/poll.yml`
+- Trigger: cron `*/5 * * * *` (every 5 min) plus `workflow_dispatch` for manual runs
+- Runner: `ubuntu-latest`
+- Secrets: `SMTP_USER`, `SMTP_PASSWORD` (encrypted, set via `gh secret set`)
+- State persistence: each run commits `state.json` back to `main` with message `state: update [skip ci]`
+- Free-tier usage: ~12 sec/run × 288 runs/day = ~58 min/day = well within the 2,000 free min/month for private repos
+
+Manage from any shell with `gh` installed:
+- Trigger poll now: `gh workflow run poll.yml`
+- Send test email: `gh workflow run test-email.yml`
+- List recent runs: `gh run list --workflow=poll.yml --limit 10`
+- View a run's logs: `gh run view <id> --log`
+- Pause cloud schedule: `gh workflow disable poll.yml`
+- Resume: `gh workflow enable poll.yml`
+
+GitHub Actions UI: https://github.com/solenyaaaaaaa/typ3-monitor/actions
+
+## Local scheduled task (disabled, kept as fallback)
+
+- Name: `TYP3 Drop Monitor`. Currently `State: Disabled` so it does not fire.
+- If you ever want to fall back to local-only polling: disable the cloud workflow first (`gh workflow disable poll.yml`), then `Enable-ScheduledTask -TaskName "TYP3 Drop Monitor"`. Running both at once causes duplicate emails.
+- Remove entirely: `Unregister-ScheduledTask -TaskName "TYP3 Drop Monitor" -Confirm:$false`.
+
+## Tweaking behavior
+
+Edit `config.json` in the repo (commit + push to take effect on cloud runs). Top-level keys:
+
+- `email_enabled`, `email_to`, `email_subject_prefix` — email config
+- `show_toast` / `play_sound` / `open_browser_on_alert` — Windows-only desktop alert channels (no-ops on the Linux runner)
+- `user_agent`, `timeout_sec` — HTTP defaults applied to every site
+
+Per-site config blocks (`typ3`, `hempbarn_livingsoil`, `caregiverpharms`, `flowgardens_smalls`) each have:
+
+- `enabled: true|false` — toggle the site on/off
+- Site-specific URLs / parsing parameters
+- `typ3.ignore_handles` — slugs that never trigger alerts (all known merch + `test-payment`)
+- `caregiverpharms.smalls_keywords` — substrings used to identify the "smalls/micros" variant (default: `["smalls", "micros"]`)
+
+Adding a new site = a new adapter class in `monitor.py` + an entry in `SITE_CLASSES` + a config block. Each site implements `fetch()` and `diff()`.
+
+Send a one-off test email anytime:
+```
+gh workflow run test-email.yml -R solenyaaaaaaa/typ3-monitor   # from cloud
+"%LOCALAPPDATA%\Programs\Python\Python312\python.exe" monitor.py --test-email   # from this PC
+```
+
+If you ever rotate the Gmail App Password: update both `%APPDATA%\typ3-monitor\secrets.json` (local) and the GitHub repo secret (`gh secret set SMTP_PASSWORD --body <new>`).
+
+## Known caveats
+
+- **GitHub Actions cron timing is not exact.** Scheduled workflows can be delayed up to ~10–15 min during peak GitHub load. Average is much closer to 5 min. For drop monitoring this trades worst-case timing slippage for 24/7 coverage that does not depend on this PC.
+- Toast / sound / browser pop alerts no longer fire — those were Windows-only and the cloud runner is Linux. Email is the sole notification channel now. If you want desktop alerts back when you are at the PC, re-enable the local scheduled task (and disable the cloud one to avoid duplicates).
+- The site is a custom Next.js app, not stock Shopify. The HTML markers (`sold-out-card`, `data-testid="product-title"`) are stable for now but could change. If the workflow log ever shows `no products parsed; site format may have changed - keeping prior state`, the parser regex in `monitor.py` needs an update.
+- The cloud commits `state.json` back to `main` every time the catalog changes. Your local `git pull` will fast-forward those commits in. The OneDrive copy of `state.json` will only get refreshed if you `git pull`.
+- App Password security: the 16-char password is stored encrypted at rest in GitHub Secrets and only injected as an env var into the runner. It cannot be read back via `gh secret get`. To rotate, generate a new App Password at https://myaccount.google.com/apppasswords and re-run `gh secret set SMTP_PASSWORD --body <new>`.
+
+## Resuming work in a new session
+
+If a future session opens this project: cloud polling is the source of truth. Health check sequence:
+1. `gh run list --workflow=poll.yml --limit 5` — last few runs should all be green ✓.
+2. If any failed, `gh run view <id> --log-failed` to see the error.
+3. If parse errors appear (`no products parsed`), the site HTML changed — update regexes in `monitor.py`, commit, push.
+4. The local scheduled task is intentionally disabled; do not re-enable unless you also disable the cloud workflow first.

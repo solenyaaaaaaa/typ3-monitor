@@ -1,0 +1,68 @@
+{
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "timeout_sec": 25,
+  "email_enabled": true,
+  "email_subject_prefix": "[Drop Monitor]",
+  "show_toast": true,
+  "play_sound": true,
+  "open_browser_on_alert": true,
+  "max_browser_tabs_per_run": 5,
+  "typ3": {
+    "enabled": true,
+    "store_url": "https://typ3cannabis.com/store",
+    "page_param": "page",
+    "max_pages": 20,
+    "ignore_handles": [
+      "test-payment",
+      "typ3-unisex-t-shirt",
+      "typ3-pullover-hoodie",
+      "typ3-canvas-tote-bag",
+      "typ3-sticker-sheet",
+      "typ3-dad-hat",
+      "typ3-hoodie",
+      "typ3-logo-tee",
+      "stainless-steel-water-bottle-with-a-straw-lid",
+      "mug-with-color-inside",
+      "vintage-corduroy-cap",
+      "trucker-cap",
+      "embroidered-patches",
+      "snapback-hat",
+      "muscle-shirt",
+      "pom-pom-beanie"
+    ]
+  },
+  "hempbarn_livingsoil": {
+    "enabled": true,
+    "url": "https://www.thehempbarn.com/product/livingsoil/",
+    "description_keywords": ["special", "all time", "all-time"]
+  },
+  "hempbarn_organicsoil": {
+    "enabled": true,
+    "url": "https://www.thehempbarn.com/product/organicsoil/",
+    "description_keywords": ["special", "all time", "all-time"]
+  },
+  "caregiverpharms": {
+    "enabled": true,
+    "products_json_url": "https://caregiverpharms.com/products.json?limit=250",
+    "collection_url": "https://caregiverpharms.com/collections/all",
+    "smalls_keywords": ["smalls", "micros"]
+  },
+  "flowgardens_smalls": {
+    "enabled": true,
+    "product_json_url": "https://flowgardens.com/products/smalls.json",
+    "product_url": "https://flowgardens.com/products/smalls",
+    "allowed_types": [2]
+  },
+  "fiveleafwellness": {
+    "enabled": true,
+    "shop_url": "https://fiveleafwellness.com/shop/",
+    "page_keywords": ["top shelf", "top tier"],
+    "max_pages": 10
+  },
+  "beleafer_indoor": {
+    "enabled": true,
+    "category_url": "https://beleafer.com/product-category/hemp-flower/indoor/",
+    "allowed_types": [2],
+    "max_pages": 20
+  }
+}
