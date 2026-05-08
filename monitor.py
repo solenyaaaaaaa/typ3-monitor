@@ -1140,7 +1140,12 @@ def main():
     save_state(state)
     logging.info("=== run end: %d total alert(s); %s ===",
                  len(all_alerts), "; ".join(summary_lines))
-    return 1 if any_fetch_failed and not all_alerts else 0
+    # Always exit 0. Per-site fetch failures are normal transient noise
+    # at 1-min cadence; logging them is enough. Returning non-zero here
+    # would cause GitHub Actions to spam failure emails on every blip.
+    if any_fetch_failed:
+        logging.info("(one or more sites had a transient fetch error; not failing the run)")
+    return 0
 
 
 if __name__ == "__main__":
