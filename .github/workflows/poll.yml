@@ -45,4 +45,20 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state.json
           git commit -m "state: update [skip ci]"
-          git push
+          # Retry push up to 4 times with rebase, to absorb:
+          #  - races with concurrent runs ("fetch first")
+          #  - GitHub git-server hiccups (5xx)
+          for attempt in 1 2 3 4; do
+            if git push 2>&1; then
+              echo "pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "push attempt $attempt failed; rebasing and retrying..."
+            git fetch origin main
+            git rebase origin/main || { echo "rebase conflict, aborting"; git rebase --abort; }
+            sleep $((attempt * 3))
+          done
+          echo "::warning::failed to push state.json after 4 attempts; will retry on next run"
+          # Exit 0 anyway: state will be re-derived on the next run.
+          # Real alerts (if any) were already emailed before this step.
+          exit 0
