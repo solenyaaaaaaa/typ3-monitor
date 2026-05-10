@@ -9,9 +9,12 @@
   "max_browser_tabs_per_run": 5,
   "typ3": {
     "enabled": true,
-    "store_url": "https://typ3cannabis.com/store",
-    "page_param": "page",
-    "max_pages": 20,
+    "collection_urls": [
+      "https://typ3cannabis.com/collections/flower",
+      "https://typ3cannabis.com/collections/extracts",
+      "https://typ3cannabis.com/collections/vapes",
+      "https://typ3cannabis.com/collections/edibles"
+    ],
     "ignore_handles": [
       "test-payment",
       "typ3-unisex-t-shirt",

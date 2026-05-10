@@ -68,9 +68,12 @@ DEFAULT_CONFIG = {
     "max_browser_tabs_per_run": 5,
     "typ3": {
         "enabled": True,
-        "store_url": "https://typ3cannabis.com/store",
-        "page_param": "page",
-        "max_pages": 20,
+        "collection_urls": [
+            "https://typ3cannabis.com/collections/flower",
+            "https://typ3cannabis.com/collections/extracts",
+            "https://typ3cannabis.com/collections/vapes",
+            "https://typ3cannabis.com/collections/edibles",
+        ],
         "ignore_handles": [
             "test-payment",
             "typ3-unisex-t-shirt",
@@ -288,20 +291,22 @@ class Typ3Site:
         return out
 
     def fetch(self, session, ua, timeout):
-        seen = set()
         catalog = {}
-        for page in range(1, self.cfg.get("max_pages", 20) + 1):
-            url = self.cfg["store_url"]
-            params_url = f"{url}?{self.cfg.get('page_param','page')}={page}"
-            resp = http_get(session, params_url, ua, timeout)
+        # Site moved from /store?page=N to per-category /collections/<name>.
+        urls = self.cfg.get("collection_urls") or []
+        for url in urls:
+            try:
+                resp = http_get(session, url, ua, timeout)
+            except Exception as exc:
+                logging.warning("[%s] %s fetch failed: %s", self.name, url, exc)
+                continue
             products = self._parse_page(resp.text)
-            if not products:
-                break
-            fresh = [p for p in products if p["handle"] not in seen]
-            if not fresh:
-                break
-            for p in fresh:
-                seen.add(p["handle"])
+            for p in products:
+                # If a handle appears in multiple collections, prefer the
+                # available copy (more accurate stock state).
+                existing = catalog.get(p["handle"])
+                if existing and not existing["sold_out"] and p["sold_out"]:
+                    continue
                 catalog[p["handle"]] = p
             time.sleep(0.4)
         return catalog
