@@ -16,7 +16,7 @@
         "Tahiti Twist": "The Tahiti twist is back! Amazing nose on this \u2013 it smells like tropical scented bubblegum to me. Nice anytime of day Sativa dominant effects.",
         "Don Mega": "We usually do organic soil runs of this since it can be really finicky, but this batch might be the best one yet. Reeks of GMO and old school Kush/OG with Indica dominant effects."
       },
-      "last_seen": "2026-05-11T06:37:15.757071+00:00"
+      "last_seen": "2026-05-11T06:38:10.279960+00:00"
     },
     "caregiverpharms": {
       "products": {
@@ -69,7 +69,7 @@
           "smalls_available": false
         }
       },
-      "last_seen": "2026-05-11T06:37:16.121340+00:00"
+      "last_seen": "2026-05-11T06:38:10.552962+00:00"
     },
     "flowgardens_smalls": {
       "strains": [
@@ -95,7 +95,7 @@
         "White Cheddar - Type 4 (CBG)",
         "Wizard of OZ - Type 3 (CBD)"
       ],
-      "last_seen": "2026-05-11T06:37:16.294264+00:00"
+      "last_seen": "2026-05-11T06:38:10.761999+00:00"
     },
     "hempbarn_organicsoil": {
       "strains": [
@@ -125,47 +125,10 @@
         "Coffin Candy": "10/10 nose on this. Not the prettiest but this just reeks like Runtz with a skunk like twist to it. Super potent Indica dominant effects, this really put me out for the night.",
         "Bogglegum": "Another old school classic in my opinion. I first started running BOG seeds way back in the early 2000\u2019s when he would drop them on overgrow/ICMag so there is a lot of nostalgia with this strain for me. This is my favorite bubblegum strain \u2013 it smells like big league chew bubblegum with a hint of fresh hops with nice middle of the road hybrid effects that run slightly on the Indica side."
       },
-      "last_seen": "2026-05-11T06:37:15.873126+00:00"
+      "last_seen": "2026-05-11T06:38:10.314577+00:00"
     },
     "fiveleafwellness": {
       "products": {
-        "https://fiveleafwellness.com/product/nicks-nugs-the-og-10mgd9-75mgcbd/": {
-          "slug": "nicks-nugs-the-og-10mgd9-75mgcbd",
-          "url": "https://fiveleafwellness.com/product/nicks-nugs-the-og-10mgd9-75mgcbd/"
-        },
-        "https://fiveleafwellness.com/product/modern-herb-indica-gummy-5-pack/": {
-          "slug": "modern-herb-indica-gummy-5-pack",
-          "url": "https://fiveleafwellness.com/product/modern-herb-indica-gummy-5-pack/"
-        },
-        "https://fiveleafwellness.com/product/super-boof-indoor-hybrid-2/": {
-          "slug": "super-boof-indoor-hybrid-2",
-          "matched_kw": "top shelf",
-          "checked": true
-        },
-        "https://fiveleafwellness.com/product/nickss-nugs-code-red-gummies-max-potency-25mg-d9-75mg-cbd/": {
-          "slug": "nickss-nugs-code-red-gummies-max-potency-25mg-d9-75mg-cbd",
-          "url": "https://fiveleafwellness.com/product/nickss-nugs-code-red-gummies-max-potency-25mg-d9-75mg-cbd/"
-        },
-        "https://fiveleafwellness.com/product/wildwood-live-resin-gummies/": {
-          "slug": "wildwood-live-resin-gummies",
-          "url": "https://fiveleafwellness.com/product/wildwood-live-resin-gummies/"
-        },
-        "https://fiveleafwellness.com/product/chillax-by-nicks-nugs-10mg-d9-20mg-cbd/": {
-          "slug": "chillax-by-nicks-nugs-10mg-d9-20mg-cbd",
-          "url": "https://fiveleafwellness.com/product/chillax-by-nicks-nugs-10mg-d9-20mg-cbd/"
-        },
-        "https://fiveleafwellness.com/product/wildwood-thca-live-resin-core-infused-pre-roll-5ct/": {
-          "slug": "wildwood-thca-live-resin-core-infused-pre-roll-5ct",
-          "url": "https://fiveleafwellness.com/product/wildwood-thca-live-resin-core-infused-pre-roll-5ct/"
-        },
-        "https://fiveleafwellness.com/product/wildwood-live-resin-vapes/": {
-          "slug": "wildwood-live-resin-vapes",
-          "url": "https://fiveleafwellness.com/product/wildwood-live-resin-vapes/"
-        },
-        "https://fiveleafwellness.com/product/five-leaf-t-shirts/": {
-          "slug": "five-leaf-t-shirts",
-          "url": "https://fiveleafwellness.com/product/five-leaf-t-shirts/"
-        },
         "https://fiveleafwellness.com/product/moon-konez/": {
           "slug": "moon-konez",
           "url": "https://fiveleafwellness.com/product/moon-konez/"
@@ -173,6 +136,48 @@
         "https://fiveleafwellness.com/product/modern-herb-sativa-gummy-5-pack/": {
           "slug": "modern-herb-sativa-gummy-5-pack",
           "url": "https://fiveleafwellness.com/product/modern-herb-sativa-gummy-5-pack/"
+        },
+        "https://fiveleafwellness.com/product/super-boof-indoor-hybrid-2/": {
+          "slug": "super-boof-indoor-hybrid-2",
+          "matched_kw": "top shelf",
+          "checked": true
+        },
+        "https://fiveleafwellness.com/product/wildwood-live-resin-gummies/": {
+          "slug": "wildwood-live-resin-gummies",
+          "url": "https://fiveleafwellness.com/product/wildwood-live-resin-gummies/"
+        },
+        "https://fiveleafwellness.com/product/nickss-nugs-code-red-gummies-max-potency-25mg-d9-75mg-cbd/": {
+          "slug": "nickss-nugs-code-red-gummies-max-potency-25mg-d9-75mg-cbd",
+          "url": "https://fiveleafwellness.com/product/nickss-nugs-code-red-gummies-max-potency-25mg-d9-75mg-cbd/"
+        },
+        "https://fiveleafwellness.com/product/wildwood-live-resin-vapes/": {
+          "slug": "wildwood-live-resin-vapes",
+          "url": "https://fiveleafwellness.com/product/wildwood-live-resin-vapes/"
+        },
+        "https://fiveleafwellness.com/product/wildwood-thca-live-resin-core-infused-pre-roll-5ct/": {
+          "slug": "wildwood-thca-live-resin-core-infused-pre-roll-5ct",
+          "url": "https://fiveleafwellness.com/product/wildwood-thca-live-resin-core-infused-pre-roll-5ct/"
+        },
+        "https://fiveleafwellness.com/product/modern-herb-indica-gummy-5-pack/": {
+          "slug": "modern-herb-indica-gummy-5-pack",
+          "url": "https://fiveleafwellness.com/product/modern-herb-indica-gummy-5-pack/"
+        },
+        "https://fiveleafwellness.com/product/nicks-nugs-the-og-10mgd9-75mgcbd/": {
+          "slug": "nicks-nugs-the-og-10mgd9-75mgcbd",
+          "url": "https://fiveleafwellness.com/product/nicks-nugs-the-og-10mgd9-75mgcbd/"
+        },
+        "https://fiveleafwellness.com/product/vampire-slayer-disposable-indica/": {
+          "slug": "vampire-slayer-disposable-indica",
+          "matched_kw": null,
+          "checked": true
+        },
+        "https://fiveleafwellness.com/product/hemp-rolls/": {
+          "slug": "hemp-rolls",
+          "url": "https://fiveleafwellness.com/product/hemp-rolls/"
+        },
+        "https://fiveleafwellness.com/product/five-leaf-t-shirts/": {
+          "slug": "five-leaf-t-shirts",
+          "url": "https://fiveleafwellness.com/product/five-leaf-t-shirts/"
         },
         "https://fiveleafwellness.com/product/shabazz-x-five-leaf-apparel/": {
           "slug": "shabazz-x-five-leaf-apparel",
@@ -182,51 +187,26 @@
           "slug": "wildwood-thca-pre-roll-sativa",
           "url": "https://fiveleafwellness.com/product/wildwood-thca-pre-roll-sativa/"
         },
-        "https://fiveleafwellness.com/product/hemp-rolls/": {
-          "slug": "hemp-rolls",
-          "url": "https://fiveleafwellness.com/product/hemp-rolls/"
-        },
         "https://fiveleafwellness.com/product/gelato-king-indoor-indica-hybrid/": {
           "slug": "gelato-king-indoor-indica-hybrid",
           "url": "https://fiveleafwellness.com/product/gelato-king-indoor-indica-hybrid/"
         },
-        "https://fiveleafwellness.com/product/vampire-slayer-disposable-indica/": {
-          "slug": "vampire-slayer-disposable-indica",
-          "matched_kw": null,
-          "checked": true
+        "https://fiveleafwellness.com/product/chillax-by-nicks-nugs-10mg-d9-20mg-cbd/": {
+          "slug": "chillax-by-nicks-nugs-10mg-d9-20mg-cbd",
+          "url": "https://fiveleafwellness.com/product/chillax-by-nicks-nugs-10mg-d9-20mg-cbd/"
         }
       },
-      "last_seen": "2026-05-11T06:37:16.821201+00:00"
+      "last_seen": "2026-05-11T06:38:11.326600+00:00"
     },
     "beleafer_indoor": {
       "products": {
-        "https://beleafer.com/product/grape-tape-indoor/": {
-          "slug": "grape-tape-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/pineapple-flookies-indoor/": {
-          "slug": "pineapple-flookies-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/sunset-sorbet-indoor/": {
-          "slug": "sunset-sorbet-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/garlic-smacks-indoor/": {
-          "slug": "garlic-smacks-indoor",
-          "types": [],
-          "checked": false
-        },
         "https://beleafer.com/product/blueberry-tart-indoor/": {
           "slug": "blueberry-tart-indoor",
           "types": [],
           "checked": false
         },
-        "https://beleafer.com/product/gas-muffinz-indoor/": {
-          "slug": "gas-muffinz-indoor",
+        "https://beleafer.com/product/zebbles-indoor/": {
+          "slug": "zebbles-indoor",
           "types": [],
           "checked": false
         },
@@ -235,13 +215,28 @@
           "types": [],
           "checked": false
         },
-        "https://beleafer.com/product/grape-goddess-indoor/": {
-          "slug": "grape-goddess-indoor",
+        "https://beleafer.com/product/zombie-breath-indoor/": {
+          "slug": "zombie-breath-indoor",
           "types": [],
           "checked": false
         },
-        "https://beleafer.com/product/sunburst-indoor/": {
-          "slug": "sunburst-indoor",
+        "https://beleafer.com/product/4-strain-28g-sampler-indoor-flower/": {
+          "slug": "4-strain-28g-sampler-indoor-flower",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/kush-by-the-foot-1-indoor/": {
+          "slug": "kush-by-the-foot-1-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/rainbow-sherbert-indoor/": {
+          "slug": "rainbow-sherbert-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/lemon-octane-indoor-2/": {
+          "slug": "lemon-octane-indoor-2",
           "types": [],
           "checked": false
         },
@@ -250,8 +245,18 @@
           "types": [],
           "checked": false
         },
-        "https://beleafer.com/product/hexxed-indoor/": {
-          "slug": "hexxed-indoor",
+        "https://beleafer.com/product/remedy-cookies-indoor/": {
+          "slug": "remedy-cookies-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/darth-fader-indoor/": {
+          "slug": "darth-fader-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/pineapple-flookies-indoor/": {
+          "slug": "pineapple-flookies-indoor",
           "types": [],
           "checked": false
         },
@@ -260,13 +265,23 @@
           "types": [],
           "checked": false
         },
-        "https://beleafer.com/product/remedy-cookies-indoor/": {
-          "slug": "remedy-cookies-indoor",
+        "https://beleafer.com/product/2-strain-28g-sampler-indoor-flower/": {
+          "slug": "2-strain-28g-sampler-indoor-flower",
           "types": [],
           "checked": false
         },
-        "https://beleafer.com/product/gummy-breath-indoor/": {
-          "slug": "gummy-breath-indoor",
+        "https://beleafer.com/product/garlic-gooey-indoor/": {
+          "slug": "garlic-gooey-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/4-strain-28g-sampler-indoor-flower-smalls/": {
+          "slug": "4-strain-28g-sampler-indoor-flower-smalls",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/garlic-smacks-indoor/": {
+          "slug": "garlic-smacks-indoor",
           "types": [],
           "checked": false
         },
@@ -280,88 +295,13 @@
           "types": [],
           "checked": false
         },
-        "https://beleafer.com/product/kush-colada-indoor/": {
-          "slug": "kush-colada-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/kush-by-the-foot-1-indoor/": {
-          "slug": "kush-by-the-foot-1-indoor",
-          "types": [],
-          "checked": false
-        },
         "https://beleafer.com/product/gaia-goo-indoor/": {
           "slug": "gaia-goo-indoor",
           "types": [],
           "checked": false
         },
-        "https://beleafer.com/product/zombie-breath-indoor/": {
-          "slug": "zombie-breath-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/zebbles-indoor/": {
-          "slug": "zebbles-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/garlic-gooey-indoor/": {
-          "slug": "garlic-gooey-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/violet-sour-indoor/": {
-          "slug": "violet-sour-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/8-strain-28g-sampler-indoor-flower/": {
-          "slug": "8-strain-28g-sampler-indoor-flower",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/eleven-flookies-indoor/": {
-          "slug": "eleven-flookies-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/oasis-og-indoor/": {
-          "slug": "oasis-og-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/darth-fader-indoor/": {
-          "slug": "darth-fader-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/lemonfade-indoor/": {
-          "slug": "lemonfade-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/blue-eyes-white-kush-indoor/": {
-          "slug": "blue-eyes-white-kush-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/4-strain-28g-sampler-indoor-flower/": {
-          "slug": "4-strain-28g-sampler-indoor-flower",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/milky-whey-cbg-indoor/": {
-          "slug": "milky-whey-cbg-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/permanent-lavender-indoor/": {
-          "slug": "permanent-lavender-indoor",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/rainbow-sherbert-indoor/": {
-          "slug": "rainbow-sherbert-indoor",
+        "https://beleafer.com/product/hexxed-indoor/": {
+          "slug": "hexxed-indoor",
           "types": [],
           "checked": false
         },
@@ -370,23 +310,73 @@
           "types": [],
           "checked": false
         },
+        "https://beleafer.com/product/sunburst-indoor/": {
+          "slug": "sunburst-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/grape-goddess-indoor/": {
+          "slug": "grape-goddess-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/lemonfade-indoor/": {
+          "slug": "lemonfade-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/gummy-breath-indoor/": {
+          "slug": "gummy-breath-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/permanent-lavender-indoor/": {
+          "slug": "permanent-lavender-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/milky-whey-cbg-indoor/": {
+          "slug": "milky-whey-cbg-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/blue-eyes-white-kush-indoor/": {
+          "slug": "blue-eyes-white-kush-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/oasis-og-indoor/": {
+          "slug": "oasis-og-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/sunset-sorbet-indoor/": {
+          "slug": "sunset-sorbet-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/kush-colada-indoor/": {
+          "slug": "kush-colada-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/gas-muffinz-indoor/": {
+          "slug": "gas-muffinz-indoor",
+          "types": [],
+          "checked": false
+        },
         "https://beleafer.com/product/terra-fuel-indoor/": {
           "slug": "terra-fuel-indoor",
           "types": [],
           "checked": false
         },
-        "https://beleafer.com/product/2-strain-28g-sampler-indoor-flower/": {
-          "slug": "2-strain-28g-sampler-indoor-flower",
+        "https://beleafer.com/product/grape-tape-indoor/": {
+          "slug": "grape-tape-indoor",
           "types": [],
           "checked": false
         },
-        "https://beleafer.com/product/lemon-octane-indoor-2/": {
-          "slug": "lemon-octane-indoor-2",
-          "types": [],
-          "checked": false
-        },
-        "https://beleafer.com/product/4-strain-28g-sampler-indoor-flower-smalls/": {
-          "slug": "4-strain-28g-sampler-indoor-flower-smalls",
+        "https://beleafer.com/product/violet-sour-indoor/": {
+          "slug": "violet-sour-indoor",
           "types": [],
           "checked": false
         },
@@ -394,10 +384,20 @@
           "slug": "emo-indoor",
           "types": [],
           "checked": false
+        },
+        "https://beleafer.com/product/eleven-flookies-indoor/": {
+          "slug": "eleven-flookies-indoor",
+          "types": [],
+          "checked": false
+        },
+        "https://beleafer.com/product/8-strain-28g-sampler-indoor-flower/": {
+          "slug": "8-strain-28g-sampler-indoor-flower",
+          "types": [],
+          "checked": false
         }
       },
-      "last_seen": "2026-05-11T06:37:18.875206+00:00"
+      "last_seen": "2026-05-11T06:38:12.863687+00:00"
     }
   },
-  "last_run": "2026-05-11T06:37:18.875246+00:00"
+  "last_run": "2026-05-11T06:38:12.863734+00:00"
 }
