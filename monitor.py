@@ -340,7 +340,9 @@ class Typ3Site:
                         "kind": "RESTOCK", "title": prod["title"],
                         "url": url, "details": prod["price"],
                     })
-        new_state = {"products": {}}
+        # Preserve previously-seen handles so that a product flickering off
+        # a collection page does not get re-detected as a DROP next time.
+        new_state = {"products": dict(prev)}
         for handle, prod in current.items():
             prior = prev.get(handle, {})
             new_state["products"][handle] = {
@@ -457,9 +459,14 @@ class HempBarnSite:
                 "kind": "NEW_STRAIN", "title": strain,
                 "url": self.cfg["url"], "details": detail,
             })
+        # Preserve all previously-seen strains so that one falling off the
+        # dropdown does not re-alert later. Descriptions: merge so that any
+        # strain currently visible gets its fresh description text.
+        merged_descriptions = dict(prev_state.get("descriptions", {}))
+        merged_descriptions.update(descriptions)
         new_state = {
-            "strains": sorted(curr_strains),
-            "descriptions": descriptions,
+            "strains": sorted(prev_strains | curr_strains),
+            "descriptions": merged_descriptions,
             "last_seen": now_iso,
         }
         return new_state, alerts
@@ -544,8 +551,12 @@ class CaregiverPharmsSite:
                     "url": url,
                     "details": "smalls/micros variant available",
                 })
-        new_state = {"products": {h: dict(p) for h, p in current.items()},
-                     "last_seen": now_iso}
+        # Preserve previously-seen handles to prevent re-alerts when a
+        # product temporarily disappears from the collection JSON.
+        merged_products = dict(prev)
+        for handle, p in current.items():
+            merged_products[handle] = dict(p)
+        new_state = {"products": merged_products, "last_seen": now_iso}
         return new_state, alerts
 
 
@@ -605,8 +616,10 @@ class FlowGardensSmallsSite:
                 "url": self.cfg["product_url"],
                 "details": details,
             })
+        # Preserve all previously-seen strains so that one falling off the
+        # dropdown does not re-alert later when it returns.
         new_state = {
-            "strains": sorted(curr_strains),
+            "strains": sorted(prev_strains | curr_strains),
             "last_seen": now_iso,
         }
         return new_state, alerts
@@ -721,7 +734,10 @@ class FiveLeafWellnessSite:
         curr_urls = set(current.get("product_urls", []))
         prev_urls = set(prev_products.keys())
 
-        merged = {url: prev_products[url] for url in (curr_urls & prev_urls)}
+        # Preserve ALL previously-seen products so that a product flickering
+        # off the listing page (transient caching, related-products rotation,
+        # etc.) does not get "forgotten" and re-alert when it reappears.
+        merged = dict(prev_products)
         alerts = []
         new_urls = sorted(curr_urls - prev_urls)
 
@@ -840,7 +856,9 @@ class BeleaferIndoorSite:
         curr_urls = set(current.get("product_urls", []))
         prev_urls = set(prev.keys())
 
-        merged = {url: prev[url] for url in (curr_urls & prev_urls)}
+        # Preserve all previously-seen products so a product flickering off
+        # the listing page does not re-trigger a NEW_PRODUCT alert later.
+        merged = dict(prev)
         alerts = []
         new_urls = sorted(curr_urls - prev_urls)
 
