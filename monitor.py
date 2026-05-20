@@ -126,12 +126,14 @@ DEFAULT_CONFIG = {
         "category_url": "https://beleafer.com/product-category/hemp-flower/indoor/",
         "allowed_types": [2],
         "max_pages": 20,
+        "min_interval_minutes": 5,
     },
     "highalpinegenetics": {
         "enabled": True,
         "search_url": "https://www.highalpinegenetics.com/apps/search?q=+",
         "allowed_types": [1, 2],
         "max_pages": 30,
+        "min_interval_minutes": 5,
     },
 }
 
@@ -1300,9 +1302,26 @@ def main():
     summary_lines = []
     any_fetch_failed = False
 
+    now_utc = datetime.now(timezone.utc)
     for site in sites:
         prev = state["sites"].get(site.name, {})
         first_run_for_site = not prev
+
+        # Per-site throttle: skip if min_interval_minutes has not elapsed.
+        min_interval = float(site.cfg.get("min_interval_minutes", 0) or 0)
+        if min_interval > 0 and prev.get("last_polled_at"):
+            try:
+                last_dt = datetime.fromisoformat(prev["last_polled_at"])
+                elapsed_min = (now_utc - last_dt).total_seconds() / 60.0
+                if elapsed_min < min_interval:
+                    summary_lines.append(
+                        f"{site.name}: skipped ({elapsed_min:.1f}m / {min_interval:.0f}m)"
+                    )
+                    continue
+            except Exception as exc:
+                logging.warning("[%s] could not parse last_polled_at: %s",
+                                site.name, exc)
+
         try:
             current = site.fetch(session, ua, timeout)
         except Exception as exc:
@@ -1317,6 +1336,9 @@ def main():
             logging.error("[%s] diff failed: %s", site.name, exc)
             summary_lines.append(f"{site.name}: DIFF FAILED ({exc})")
             continue
+
+        # Record the poll time so the next run can apply throttling.
+        new_state["last_polled_at"] = now_utc.isoformat()
 
         if first_run_for_site:
             logging.info("[%s] first run: seeding (no alerts fired)", site.name)
