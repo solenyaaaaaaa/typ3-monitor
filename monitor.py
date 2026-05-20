@@ -127,6 +127,12 @@ DEFAULT_CONFIG = {
         "allowed_types": [2],
         "max_pages": 20,
     },
+    "highalpinegenetics": {
+        "enabled": True,
+        "search_url": "https://www.highalpinegenetics.com/apps/search?q=+",
+        "allowed_types": [1, 2],
+        "max_pages": 30,
+    },
 }
 
 
@@ -896,6 +902,172 @@ class BeleaferIndoorSite:
         return {"products": merged, "last_seen": now_iso}, alerts
 
 
+class HighAlpineGeneticsSite:
+    """Weebly-based shop that mixes seeds and flower in one search listing.
+    Alerts only when (a) the product is NOT a seed AND (b) the product name
+    OR description contains "Type N" matching `allowed_types`.
+    """
+    name = "highalpinegenetics"
+    label = "High Alpine Genetics"
+
+    SEARCH_URL = "https://www.highalpinegenetics.com/apps/search"
+    BASE_URL = "https://www.highalpinegenetics.com"
+
+    RESULT_RE = re.compile(
+        r'<li class="wsite-search-product-result">\s*'
+        r'<a href="([^"]+)"[^>]*>[\s\S]*?'
+        r'<span class="wsite-search-product-name" title="[^"]*">([^<]+)</span>'
+        r'[\s\S]*?</li>',
+        re.IGNORECASE,
+    )
+    DESC_RE = re.compile(
+        r'<div[^>]*itemprop="description"[^>]*>([\s\S]*?)</div>',
+        re.IGNORECASE,
+    )
+    TYPE_RE = re.compile(r'\btype\s*(?:#)?(\d+)\b', re.IGNORECASE)
+    SEED_NAME_RE = re.compile(r'\b(seed|seeds|fem|feminized)\b', re.IGNORECASE)
+    # Phrases that strongly indicate a seed/cultivation product even when the
+    # product name does not say "seed" explicitly.
+    SEED_DESC_PHRASES = (
+        "flowering time", "weeks flowering", "germinat", "f1 hybrid",
+        "bred by", "breeding project", "phenotype",
+    )
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.search_url = cfg.get("search_url", f"{self.SEARCH_URL}?q=+")
+        at = cfg.get("allowed_types") or [1, 2]
+        self.allowed_types = set(int(x) for x in at)
+        self.max_pages = cfg.get("max_pages", 30)
+        self._session = None
+        self._ua = None
+        self._timeout = None
+
+    def fetch(self, session, ua, timeout):
+        self._session = session
+        self._ua = ua
+        self._timeout = timeout
+        results = {}
+        # Strip any existing &page= from the configured URL.
+        base = re.sub(r"&page=\d+", "", self.search_url)
+        sep = "&" if "?" in base else "?"
+        for page in range(1, self.max_pages + 1):
+            page_url = base if page == 1 else f"{base}{sep}page={page}"
+            try:
+                resp = http_get(session, page_url, ua, timeout)
+            except requests.HTTPError as e:
+                if e.response is not None and e.response.status_code == 404:
+                    break
+                raise
+            page_results = self._parse_results(resp.text)
+            if not page_results:
+                break
+            fresh = {u: n for u, n in page_results.items() if u not in results}
+            if not fresh:
+                break
+            results.update(fresh)
+            time.sleep(0.4)
+        return {"results": results}
+
+    @classmethod
+    def _parse_results(cls, html_text):
+        out = {}
+        for m in cls.RESULT_RE.finditer(html_text):
+            href = m.group(1)
+            name = htmllib.unescape(m.group(2)).strip()
+            if href.startswith("/"):
+                href = cls.BASE_URL + href
+            out[href] = name
+        return out
+
+    def _fetch_detail(self, url):
+        try:
+            resp = http_get(self._session, url, self._ua, self._timeout)
+            return resp.text
+        except Exception as exc:
+            logging.warning("[%s] failed to fetch %s: %s", self.name, url, exc)
+            return None
+
+    def _description_text(self, html_text):
+        if not html_text:
+            return ""
+        m = self.DESC_RE.search(html_text)
+        if not m:
+            return ""
+        text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ",
+                      m.group(1), flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = htmllib.unescape(text)
+        return re.sub(r"\s+", " ", text).strip()
+
+    def _is_seed(self, name, desc_text):
+        if self.SEED_NAME_RE.search(name or ""):
+            return True
+        desc_l = (desc_text or "").lower()
+        if any(p in desc_l for p in self.SEED_DESC_PHRASES):
+            return True
+        if len(re.findall(r"\bseeds?\b", desc_l)) >= 3:
+            return True
+        return False
+
+    def _types_in(self, text):
+        return set(int(t) for t in self.TYPE_RE.findall(text or ""))
+
+    def diff(self, prev_state, current):
+        now_iso = datetime.now(timezone.utc).isoformat()
+        prev = prev_state.get("products", {})
+        is_first_run = not prev
+        curr = current.get("results", {})
+        curr_urls = set(curr.keys())
+        prev_urls = set(prev.keys())
+
+        # Preserve everything previously seen so listing flickers do not cause
+        # duplicate alerts when a product reappears later.
+        merged = dict(prev)
+        alerts = []
+        new_urls = sorted(curr_urls - prev_urls)
+
+        for url in new_urls:
+            name = curr.get(url, "")
+            if is_first_run:
+                merged[url] = {
+                    "name": name, "is_seed": None,
+                    "matched_types": [], "checked": False,
+                }
+                continue
+            html_text = self._fetch_detail(url)
+            desc_text = self._description_text(html_text)
+            is_seed = self._is_seed(name, desc_text)
+            types_in_name = self._types_in(name)
+            types_in_desc = self._types_in(desc_text)
+            all_types = sorted(types_in_name | types_in_desc)
+            merged[url] = {
+                "name": name,
+                "is_seed": is_seed,
+                "matched_types": all_types,
+                "checked": True,
+            }
+            if is_seed:
+                logging.info("[%s] %s suppressed (seed)", self.name, name)
+                time.sleep(0.3)
+                continue
+            matched = (types_in_name | types_in_desc) & self.allowed_types
+            if matched:
+                kinds = ", ".join(f"Type {t}" for t in sorted(matched))
+                alerts.append({
+                    "site": self.name, "label": self.label,
+                    "kind": "NEW_PRODUCT", "title": name,
+                    "url": url,
+                    "details": kinds,
+                })
+            else:
+                logging.info(
+                    "[%s] %s suppressed (no type 1/2)", self.name, name,
+                )
+            time.sleep(0.3)
+        return {"products": merged, "last_seen": now_iso}, alerts
+
+
 SITE_CLASSES = {
     "typ3": Typ3Site,
     "hempbarn_livingsoil": HempBarnLivingSoilSite,
@@ -904,6 +1076,7 @@ SITE_CLASSES = {
     "flowgardens_smalls": FlowGardensSmallsSite,
     "fiveleafwellness": FiveLeafWellnessSite,
     "beleafer_indoor": BeleaferIndoorSite,
+    "highalpinegenetics": HighAlpineGeneticsSite,
 }
 
 

@@ -67,5 +67,11 @@
     "category_url": "https://beleafer.com/product-category/hemp-flower/indoor/",
     "allowed_types": [2],
     "max_pages": 20
+  },
+  "highalpinegenetics": {
+    "enabled": true,
+    "search_url": "https://www.highalpinegenetics.com/apps/search?q=+",
+    "allowed_types": [1, 2],
+    "max_pages": 30
   }
 }
