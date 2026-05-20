@@ -926,11 +926,13 @@ class HighAlpineGeneticsSite:
     )
     TYPE_RE = re.compile(r'\btype\s*(?:#)?(\d+)\b', re.IGNORECASE)
     SEED_NAME_RE = re.compile(r'\b(seed|seeds|fem|feminized)\b', re.IGNORECASE)
-    # Phrases that strongly indicate a seed/cultivation product even when the
-    # product name does not say "seed" explicitly.
-    SEED_DESC_PHRASES = (
-        "flowering time", "weeks flowering", "germinat", "f1 hybrid",
-        "bred by", "breeding project", "phenotype",
+    # Phrases that unambiguously indicate a seed / cultivation product even
+    # when the product name does not say "seed" explicitly. Kept tight on
+    # purpose: terms like "f1 hybrid", "bred by", "phenotype" also appear
+    # in normal flower marketing copy, so they are NOT in this list.
+    # Tunable via config["seed_phrases"].
+    DEFAULT_SEED_DESC_PHRASES = (
+        "flowering time", "weeks flowering", "germinat",
     )
 
     def __init__(self, cfg):
@@ -939,6 +941,8 @@ class HighAlpineGeneticsSite:
         at = cfg.get("allowed_types") or [1, 2]
         self.allowed_types = set(int(x) for x in at)
         self.max_pages = cfg.get("max_pages", 30)
+        sp = cfg.get("seed_phrases")
+        self.seed_phrases = tuple(p.lower() for p in sp) if sp else self.DEFAULT_SEED_DESC_PHRASES
         self._session = None
         self._ua = None
         self._timeout = None
@@ -1004,7 +1008,7 @@ class HighAlpineGeneticsSite:
         if self.SEED_NAME_RE.search(name or ""):
             return True
         desc_l = (desc_text or "").lower()
-        if any(p in desc_l for p in self.SEED_DESC_PHRASES):
+        if any(p in desc_l for p in self.seed_phrases):
             return True
         if len(re.findall(r"\bseeds?\b", desc_l)) >= 3:
             return True
