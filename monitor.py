@@ -936,6 +936,10 @@ class HighAlpineGeneticsSite:
     DEFAULT_SEED_DESC_PHRASES = (
         "flowering time", "weeks flowering", "germinat",
     )
+    # Phrases that signal a concentrate / extract product. If any of these
+    # appear in the description, we do NOT treat the product as a seed even
+    # when the seed_phrases above also match. Tunable via config["non_seed_overrides"].
+    DEFAULT_NON_SEED_OVERRIDES = ("rosin",)
 
     def __init__(self, cfg):
         self.cfg = cfg
@@ -945,6 +949,8 @@ class HighAlpineGeneticsSite:
         self.max_pages = cfg.get("max_pages", 30)
         sp = cfg.get("seed_phrases")
         self.seed_phrases = tuple(p.lower() for p in sp) if sp else self.DEFAULT_SEED_DESC_PHRASES
+        ns = cfg.get("non_seed_overrides")
+        self.non_seed_overrides = tuple(p.lower() for p in ns) if ns else self.DEFAULT_NON_SEED_OVERRIDES
         self._session = None
         self._ua = None
         self._timeout = None
@@ -1007,9 +1013,16 @@ class HighAlpineGeneticsSite:
         return re.sub(r"\s+", " ", text).strip()
 
     def _is_seed(self, name, desc_text):
+        # Name-based "seed/seeds/fem/feminized" check is definitive and is
+        # not overridden by description signals.
         if self.SEED_NAME_RE.search(name or ""):
             return True
         desc_l = (desc_text or "").lower()
+        # Concentrate override: description signals an extract product (e.g.,
+        # "rosin"). Skip the description-based seed phrases that could
+        # otherwise false-positive when describing source plant material.
+        if any(p in desc_l for p in self.non_seed_overrides):
+            return False
         if any(p in desc_l for p in self.seed_phrases):
             return True
         if len(re.findall(r"\bseeds?\b", desc_l)) >= 3:
