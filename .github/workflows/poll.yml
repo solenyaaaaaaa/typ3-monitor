@@ -47,15 +47,24 @@ jobs:
           git commit -m "state: update [skip ci]"
           # Retry push up to 4 times with rebase, to absorb:
           #  - races with concurrent runs ("fetch first")
-          #  - GitHub git-server hiccups (5xx)
+          #  - GitHub git-server hiccups (5xx, exit 128)
+          # Disable bash -e for the loop: every command in the loop is
+          # allowed to fail without killing the step. We handle outcomes
+          # explicitly via the if/then on git push.
+          set +e
           for attempt in 1 2 3 4; do
-            if git push 2>&1; then
+            git push 2>&1
+            if [ $? -eq 0 ]; then
               echo "pushed on attempt $attempt"
               exit 0
             fi
             echo "push attempt $attempt failed; rebasing and retrying..."
             git fetch origin main
-            git rebase origin/main || { echo "rebase conflict, aborting"; git rebase --abort; }
+            git rebase origin/main
+            if [ $? -ne 0 ]; then
+              echo "rebase conflict, aborting"
+              git rebase --abort
+            fi
             sleep $((attempt * 3))
           done
           echo "::warning::failed to push state.json after 4 attempts; will retry on next run"
