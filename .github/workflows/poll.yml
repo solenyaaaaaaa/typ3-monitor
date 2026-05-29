@@ -33,6 +33,7 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
         run: python monitor.py
 
       - name: Commit updated state
