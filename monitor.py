@@ -1388,8 +1388,9 @@ def main():
 
 
 def ping_healthcheck():
-    url = os.environ.get("HEALTHCHECK_URL", "").strip()
-    if not url:
+    # Strip whitespace and any stray BOM that can sneak in via secret managers.
+    url = os.environ.get("HEALTHCHECK_URL", "").strip().lstrip("﻿").strip()
+    if not url.startswith("http"):
         return
     try:
         requests.get(url, timeout=10)
