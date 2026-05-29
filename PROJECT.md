@@ -1,6 +1,16 @@
 # typ3-monitor (multi-site drop monitor)
 
-Polls a configured list of cannabis storefronts every 5 minutes via GitHub Actions and emails on drops, restocks, and new variant options.
+Polls a configured list of cannabis storefronts every minute and emails on drops, restocks, and new variant options.
+
+## Architecture (as of 2026-05-29)
+
+**Trigger:** Google Cloud Scheduler job `drop-monitor-trigger` (project `drop-monitor-497817`, region `us-central1`, schedule `* * * * *`) POSTs to GitHub `workflow_dispatch` every minute. Free tier (1 of 3 free jobs). Replaced cron-job.org, which silently auto-disabled itself on 2026-05-26 and caused a missed drop.
+**Backup trigger:** GitHub Actions native `schedule: */5` left ON for defense-in-depth.
+**Runner:** GitHub Actions (public repo `solenyaaaaaaa/typ3-monitor`, unlimited free minutes) runs `monitor.py`.
+**Failure detection:** healthchecks.io dead-man's-switch. `monitor.py` pings `HEALTHCHECK_URL` (repo secret) every run; if pings stop ~15 min, healthchecks.io emails shlomotess@gmail.com from its own infra. This is what was missing when cron-job.org died silently.
+**Cost:** $0. (A GCP VM was rejected because the required external IP costs ~$3/mo.)
+
+To manage the trigger you need `gcloud` authed as shlomotess@gmail.com — see SYSTEM-MODS.md (2026-05-29 entry) for pause/resume/inspect commands.
 
 ## Status — 2026-05-06
 
