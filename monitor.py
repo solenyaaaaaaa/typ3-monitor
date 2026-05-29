@@ -1380,7 +1380,21 @@ def main():
     # would cause GitHub Actions to spam failure emails on every blip.
     if any_fetch_failed:
         logging.info("(one or more sites had a transient fetch error; not failing the run)")
+    # Dead-man's-switch: ping the healthcheck URL on every completed run.
+    # If these pings stop (box dead, cron broken, network down), the
+    # healthcheck provider alerts the user from its own infrastructure.
+    ping_healthcheck()
     return 0
+
+
+def ping_healthcheck():
+    url = os.environ.get("HEALTHCHECK_URL", "").strip()
+    if not url:
+        return
+    try:
+        requests.get(url, timeout=10)
+    except Exception as exc:
+        logging.warning("healthcheck ping failed: %s", exc)
 
 
 if __name__ == "__main__":
