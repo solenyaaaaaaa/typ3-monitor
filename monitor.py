@@ -440,41 +440,55 @@ class HempBarnSite:
         now_iso = datetime.now(timezone.utc).isoformat()
         prev_strains = set(prev_state.get("strains", []))
         curr_strains = set(current.get("strains", []))
-        is_first_run = not prev_strains
-        new_ones = sorted(curr_strains - prev_strains)
         descriptions = current.get("descriptions", {})
-        alerts = []
-        for strain in new_ones:
-            desc = descriptions.get(strain, "")
-            if self.description_keywords:
-                desc_lower = desc.lower()
-                matched = next(
-                    (kw for kw in self.description_keywords if kw in desc_lower),
-                    None,
-                )
-                if not matched:
-                    if not is_first_run:
-                        logging.info(
-                            "[%s] new strain '%s' suppressed: description does not match %s",
-                            self.name, strain, self.description_keywords,
-                        )
-                    continue
-                detail = f'matched keyword "{matched}"'
-            else:
-                detail = "added to strain dropdown"
-            alerts.append({
-                "site": self.name, "label": self.label,
-                "kind": "NEW_STRAIN", "title": strain,
-                "url": self.cfg["url"], "details": detail,
-            })
-        # Preserve all previously-seen strains so that one falling off the
-        # dropdown does not re-alert later. Descriptions: merge so that any
-        # strain currently visible gets its fresh description text.
+        # Merge descriptions so a strain keeps its best-known description even
+        # if one run fails to re-extract it. Preserve all previously-seen
+        # strains so one falling off the dropdown does not re-alert later.
         merged_descriptions = dict(prev_state.get("descriptions", {}))
         merged_descriptions.update(descriptions)
+
+        is_first_run = not prev_strains
+        # `alerted` = strains we have already fired an alert for. We re-check
+        # every not-yet-alerted strain's description on EVERY run, not only the
+        # run it first appears, because the vendor frequently adds a strain to
+        # the dropdown minutes before its description (which carries the
+        # keyword) is written onto the page. Checking only at first appearance
+        # silently dropped those (e.g. "Diesel Burger", 2026-06-16). The
+        # ABSENCE of this key marks pre-tracking state: seed it to the full
+        # current catalog so the upgrade starts clean -- no retro alerts for
+        # strains already on the page.
+        migrating = "alerted" not in prev_state
+        alerted = set(prev_state.get("alerted", []))
+
+        alerts = []
+        if is_first_run or migrating:
+            alerted |= curr_strains
+        else:
+            for strain in sorted(curr_strains - alerted):
+                if self.description_keywords:
+                    desc_lower = merged_descriptions.get(strain, "").lower()
+                    matched = next(
+                        (kw for kw in self.description_keywords if kw in desc_lower),
+                        None,
+                    )
+                    if not matched:
+                        # Keep watching; the description may match on a later
+                        # run once the vendor fills it in.
+                        continue
+                    detail = f'matched keyword "{matched}"'
+                else:
+                    detail = "added to strain dropdown"
+                alerts.append({
+                    "site": self.name, "label": self.label,
+                    "kind": "NEW_STRAIN", "title": strain,
+                    "url": self.cfg["url"], "details": detail,
+                })
+                alerted.add(strain)
+
         new_state = {
             "strains": sorted(prev_strains | curr_strains),
             "descriptions": merged_descriptions,
+            "alerted": sorted(alerted),
             "last_seen": now_iso,
         }
         return new_state, alerts

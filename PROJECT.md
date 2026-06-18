@@ -16,8 +16,8 @@ To manage the trigger you need `gcloud` authed as shlomotess@gmail.com — see S
 
 - **Multi-site, 5 sites monitored** (config in `config.json`):
   1. **TYP3 Cannabis** (`typ3cannabis.com/store`) — alerts on new product drops and restocks; ignores known merch.
-  2. **Hemp Barn — Living Soil** (`thehempbarn.com/product/livingsoil/`) — alerts only on **new strains** whose section of the product short-description contains `special` or `all time` (case-insensitive). Other new strains are silently logged.
-  3. **Hemp Barn — Organic Soil** (`thehempbarn.com/product/organicsoil/`) — same rule as Living Soil: only new strains with `special` or `all time` in the description.
+  2. **Hemp Barn — Living Soil** (`thehempbarn.com/product/livingsoil/`) — alerts only on **new strains** whose section of the product short-description contains `special`, `all time`, or `10/10` (case-insensitive). Other new strains are silently logged.
+  3. **Hemp Barn — Organic Soil** (`thehempbarn.com/product/organicsoil/`) — same rule as Living Soil: only new strains with `special`, `all time`, or `10/10` in the description.
   4. **Caregiver Pharms** (`caregiverpharms.com/collections/all`) — alerts on new product handles, on products going from all-sold-out → any-variant-available, and on a "Smalls/Micros" variant becoming available on any product.
   5. **Flow Gardens — Smalls** (`flowgardens.com/products/smalls`) — alerts only when a **new Type 2** strain is added to the dropdown (parsed from the strain name's "Type N" suffix). Type 1 / Type 3 / Type 4 / Type 5+ additions are silently logged. Configurable via `flowgardens_smalls.allowed_types` (currently `[2]`).
   6. **Five Leaf Wellness** (`fiveleafwellness.com/shop/`) — alerts only when a new product appears AND its **product detail page** contains `top shelf` or `top tier` somewhere in the title, long description, or category list. Site-wide nav (which has "Top Shelf" / "Mid Tier" category links) is excluded from the scan.
@@ -41,6 +41,8 @@ To manage the trigger you need `gcloud` authed as shlomotess@gmail.com — see S
 4. After all sites run, alerts are aggregated into **one email** with a section per site. On Windows it also fires a toast + beep + browser tab per alert.
 5. State is saved atomically. First run for any site only seeds — never alerts.
 6. One site's failure (network blip, parse error) is logged but does not stop other sites from running.
+
+**Hemp Barn keyword re-check (added 2026-06-17):** the two Hemp Barn sites match each not-yet-alerted strain's description against the keywords (`special`, `all time`, `all-time`, `10/10`) on *every* run, not just the run the strain first appears. A match fires one alert and records the strain in that site's `alerted` set in `state.json`; an unmatched strain keeps being re-checked on later runs. Rationale: the vendor often adds a strain to the dropdown minutes before its description is written, which previously dropped the match silently (e.g. "Diesel Burger" hit the dropdown 2026-06-16 19:47 UTC, its "special" description landed 19:51 UTC, so the first-appearance-only check never saw it). The re-check shipped in "start clean" mode: every strain already on the page when it deployed was seeded as `alerted`, so it did not retro-fire on the existing catalog (Diesel Burger included).
 
 ## Files
 
