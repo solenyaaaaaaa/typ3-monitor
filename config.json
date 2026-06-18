@@ -37,12 +37,12 @@
   "hempbarn_livingsoil": {
     "enabled": true,
     "url": "https://www.thehempbarn.com/product/livingsoil/",
-    "description_keywords": ["special", "all time", "all-time"]
+    "description_keywords": ["special", "all time", "all-time", "10/10"]
   },
   "hempbarn_organicsoil": {
     "enabled": true,
     "url": "https://www.thehempbarn.com/product/organicsoil/",
-    "description_keywords": ["special", "all time", "all-time"]
+    "description_keywords": ["special", "all time", "all-time", "10/10"]
   },
   "caregiverpharms": {
     "enabled": true,

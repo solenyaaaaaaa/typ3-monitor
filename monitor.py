@@ -96,12 +96,12 @@ DEFAULT_CONFIG = {
     "hempbarn_livingsoil": {
         "enabled": True,
         "url": "https://www.thehempbarn.com/product/livingsoil/",
-        "description_keywords": ["special", "all time", "all-time"],
+        "description_keywords": ["special", "all time", "all-time", "10/10"],
     },
     "hempbarn_organicsoil": {
         "enabled": True,
         "url": "https://www.thehempbarn.com/product/organicsoil/",
-        "description_keywords": ["special", "all time", "all-time"],
+        "description_keywords": ["special", "all time", "all-time", "10/10"],
     },
     "caregiverpharms": {
         "enabled": True,
@@ -483,13 +483,13 @@ class HempBarnSite:
 class HempBarnLivingSoilSite(HempBarnSite):
     name = "hempbarn_livingsoil"
     label = "Hemp Barn — Living Soil"
-    description_keywords = ["special", "all time", "all-time"]
+    description_keywords = ["special", "all time", "all-time", "10/10"]
 
 
 class HempBarnOrganicSoilSite(HempBarnSite):
     name = "hempbarn_organicsoil"
     label = "Hemp Barn — Organic Soil"
-    description_keywords = ["special", "all time", "all-time"]
+    description_keywords = ["special", "all time", "all-time", "10/10"]
 
 
 class CaregiverPharmsSite:
