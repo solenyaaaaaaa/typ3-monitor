@@ -20,7 +20,7 @@ To manage the trigger you need `gcloud` authed as shlomotess@gmail.com — see S
   3. **Hemp Barn — Organic Soil** (`thehempbarn.com/product/organicsoil/`) — same rule as Living Soil: only new strains with `special`, `all time`, or `10/10` in the description.
   4. **Caregiver Pharms** (`caregiverpharms.com/collections/all`) — alerts on new product handles, on products going from all-sold-out → any-variant-available, and on a "Smalls/Micros" variant becoming available on any product.
   5. **Flow Gardens — Smalls** (`flowgardens.com/products/smalls`) — alerts only when a **new Type 2** strain is added to the dropdown (parsed from the strain name's "Type N" suffix). Type 1 / Type 3 / Type 4 / Type 5+ additions are silently logged. Configurable via `flowgardens_smalls.allowed_types` (currently `[2]`).
-  6. **Five Leaf Wellness** (`fiveleafwellness.com/shop/`) — alerts only when a new product appears AND its **product detail page** contains `top shelf` or `top tier` somewhere in the title, long description, or category list. Site-wide nav (which has "Top Shelf" / "Mid Tier" category links) is excluded from the scan.
+  6. **Five Leaf Wellness** (`fiveleafwellness.com`) — polls the WooCommerce **Store API** (`/wp-json/wc/store/v1/products`) and alerts when a product whose authoritative `categories` include a target tier (default `top-shelf`; `mid-tier` excluded) newly appears. Tier membership is re-checked every run, so a product categorised Top Shelf *after* it first drops still alerts once. Configurable via `fiveleafwellness.target_categories`.
   7. **Beleafer — Indoor Hemp Flower** (`beleafer.com/product-category/hemp-flower/indoor/`) — alerts only when a new product appears AND its **product summary block** contains a "Type 2" designation. Type detection uses `\btype\s*N\b` regex; the scan is scoped to the WooCommerce `product-summary` block so the site's `blfr.type3` Instagram link in the footer does not false-match. Configurable via `beleafer_indoor.allowed_types`.
 - Cloud workflow runs every 5 min on a fresh Ubuntu runner; commits updated `state.json` back to `main`. Verified green after the multi-site upgrade.
 - Local Windows scheduled task: **disabled** (still registered) so cloud is the only sender.
@@ -30,7 +30,7 @@ To manage the trigger you need `gcloud` authed as shlomotess@gmail.com — see S
 
 `monitor.py` runs through each enabled site once per invocation:
 
-1. **Fetch** site-specific snapshot (HTML scrape for TYP3 + Hemp Barn; Shopify `/products.json` for Caregiver Pharms and Flow Gardens).
+1. **Fetch** site-specific snapshot (HTML scrape for TYP3 + Hemp Barn; Shopify `/products.json` for Caregiver Pharms and Flow Gardens; WooCommerce Store API for Five Leaf Wellness).
 2. **Diff** against the previous snapshot stored under `state.sites.{site_name}` in `state.json`.
 3. Each adapter emits zero or more typed alerts:
    - `DROP` — TYP3 new in-stock product
@@ -43,6 +43,8 @@ To manage the trigger you need `gcloud` authed as shlomotess@gmail.com — see S
 6. One site's failure (network blip, parse error) is logged but does not stop other sites from running.
 
 **Hemp Barn keyword re-check (added 2026-06-17):** the two Hemp Barn sites match each not-yet-alerted strain's description against the keywords (`special`, `all time`, `all-time`, `10/10`) on *every* run, not just the run the strain first appears. A match fires one alert and records the strain in that site's `alerted` set in `state.json`; an unmatched strain keeps being re-checked on later runs. Rationale: the vendor often adds a strain to the dropdown minutes before its description is written, which previously dropped the match silently (e.g. "Diesel Burger" hit the dropdown 2026-06-16 19:47 UTC, its "special" description landed 19:51 UTC, so the first-appearance-only check never saw it). The re-check shipped in "start clean" mode: every strain already on the page when it deployed was seeded as `alerted`, so it did not retro-fire on the existing catalog (Diesel Burger included).
+
+**Five Leaf Wellness rewrite (added 2026-06-19):** switched from scraping product detail pages for the literal words "top shelf" to reading the WooCommerce Store API (`/wp-json/wc/store/v1/products`) and matching each product's authoritative `categories` against `target_categories` (default `top-shelf`). The old scan missed real top-shelf drops because a product's tier renders only as a category link in the site nav (deliberately excluded to avoid false matches), so it was invisible unless those words also happened to appear in the description text; it also never re-checked a product after first sighting, so a product moved into Top Shelf after it first appeared was lost. The new adapter re-checks category membership every run (late-categorised drops still alert), tracks a per-site `alerted` set, and deployed start-clean (current top-shelf members seeded as `alerted`, old keyword-matched products carried forward). Note: this site has no `top-tier` category, so the old `top tier` keyword matched nothing. The other WooCommerce sites (Beleafer) still use the older scrape-then-check-once pattern and have the same latent "first sighting only" exposure.
 
 ## Files
 

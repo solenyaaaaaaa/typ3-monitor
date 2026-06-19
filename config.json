@@ -58,9 +58,9 @@
   },
   "fiveleafwellness": {
     "enabled": true,
+    "products_api_url": "https://fiveleafwellness.com/wp-json/wc/store/v1/products",
     "shop_url": "https://fiveleafwellness.com/shop/",
-    "page_keywords": ["top shelf", "top tier"],
-    "max_pages": 10
+    "target_categories": ["top-shelf"]
   },
   "beleafer_indoor": {
     "enabled": true,

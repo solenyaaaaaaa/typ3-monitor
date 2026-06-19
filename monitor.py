@@ -117,9 +117,9 @@ DEFAULT_CONFIG = {
     },
     "fiveleafwellness": {
         "enabled": True,
+        "products_api_url": "https://fiveleafwellness.com/wp-json/wc/store/v1/products",
         "shop_url": "https://fiveleafwellness.com/shop/",
-        "page_keywords": ["top shelf", "top tier"],
-        "max_pages": 10,
+        "target_categories": ["top-shelf"],
     },
     "beleafer_indoor": {
         "enabled": True,
@@ -648,145 +648,121 @@ class FlowGardensSmallsSite:
 
 
 class FiveLeafWellnessSite:
-    """WooCommerce shop. On a new product, fetches its detail page and alerts
-    only if the rendered page text contains one of the configured keywords.
-    Existing products are not re-scanned.
+    """WooCommerce shop monitored via the WooCommerce Store API.
+
+    Alerts when a product in one of the target categories (default: the
+    "top-shelf" tier) newly appears. Tier membership is read from each
+    product's authoritative WooCommerce ``categories`` -- not by scraping
+    page text. The previous adapter inferred the tier from the words "top
+    shelf" appearing in specific page modules, but a product's tier renders
+    only as a category link (which the scan deliberately skipped so the nav
+    menu would not false-match), and products were never re-checked after
+    first sighting. So a product moved into Top Shelf *after* it first
+    appeared -- or that dropped before being categorised -- was missed
+    forever. Reading categories from the API fixes both failure modes.
     """
     name = "fiveleafwellness"
     label = "Five Leaf Wellness"
 
-    PRODUCT_URL_RE = re.compile(
-        r'href="(https://fiveleafwellness\.com/product/[a-z0-9-]+/?)"'
-    )
-    SLUG_RE = re.compile(
-        r"https://fiveleafwellness\.com/product/([a-z0-9-]+)"
-    )
-
     def __init__(self, cfg):
         self.cfg = cfg
+        self.api_url = cfg.get(
+            "products_api_url",
+            "https://fiveleafwellness.com/wp-json/wc/store/v1/products",
+        )
         self.shop_url = cfg.get("shop_url", "https://fiveleafwellness.com/shop/")
-        # Accept either name; "page_keywords" is the new canonical key.
-        kw = cfg.get("page_keywords") or cfg.get("url_keywords") or []
-        self.keywords = [k.lower().strip() for k in kw]
-        self.max_pages = cfg.get("max_pages", 10)
-        # Set during fetch() so diff() can use the same HTTP session.
-        self._session = None
-        self._ua = None
-        self._timeout = None
-
-    @staticmethod
-    def _normalize(s):
-        s = s.lower()
-        s = re.sub(r"[\-_/]+", " ", s)
-        return re.sub(r"\s+", " ", s).strip()
-
-    def _slug_of(self, url):
-        m = self.SLUG_RE.match(url)
-        return m.group(1) if m else url
-
-    # Restrict the keyword scan to the Divi WooCommerce content modules so
-    # site nav / footer ("Top Shelf" / "Mid Tier" category links) do not match.
-    SCOPED_CLASSES = ("et_pb_wc_title", "et_pb_wc_description", "et_pb_wc_meta")
-    SECTION_BOUNDARY = re.compile(
-        r'<div[^>]*class="et_pb_(?:module|section|row|column)[\s"]',
-        re.IGNORECASE,
-    )
-
-    def _scoped_text(self, page_html):
-        chunks = []
-        for cls in self.SCOPED_CLASSES:
-            for m in re.finditer(
-                rf'<div[^>]*class="[^"]*{cls}[^"]*"[^>]*>',
-                page_html, re.IGNORECASE,
-            ):
-                start = m.end()
-                bnd = self.SECTION_BOUNDARY.search(page_html, start + 1)
-                end = bnd.start() if bnd else min(start + 20000, len(page_html))
-                chunks.append(page_html[start:end])
-        return "\n".join(chunks)
-
-    def _match_in_text(self, page_html):
-        if not page_html:
-            return None
-        scoped = self._scoped_text(page_html)
-        text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ",
-                      scoped, flags=re.DOTALL | re.IGNORECASE)
-        text = re.sub(r"<[^>]+>", " ", text)
-        text = htmllib.unescape(text)
-        n = self._normalize(text)
-        for kw in self.keywords:
-            if self._normalize(kw) in n:
-                return kw
-        return None
-
-    def _fetch_product_page(self, url):
-        try:
-            resp = http_get(self._session, url, self._ua, self._timeout)
-            return resp.text
-        except Exception as exc:
-            logging.warning("[%s] failed to fetch %s: %s", self.name, url, exc)
-            return None
+        # Category slugs that trigger an alert. The site's top tier is the
+        # "top-shelf" category; "mid-tier" is lower and intentionally excluded.
+        # (There is no "top-tier" category on this site -- it was a synonym in
+        # the old keyword list that matched nothing.)
+        self.target_categories = [
+            c.lower().strip() for c in cfg.get("target_categories", ["top-shelf"])
+        ]
 
     def fetch(self, session, ua, timeout):
-        self._session = session
-        self._ua = ua
-        self._timeout = timeout
-        urls = set()
-        base = self.shop_url.rstrip("/")
-        for page in range(1, self.max_pages + 1):
-            page_url = self.shop_url if page == 1 else f"{base}/page/{page}/"
+        products = {}
+        page = 1
+        while True:
+            url = f"{self.api_url}?per_page=100&page={page}"
+            resp = http_get(session, url, ua, timeout, expect_json=True)
+            batch = resp.json()
+            if not isinstance(batch, list):
+                raise RuntimeError("store API did not return a product list")
+            for p in batch:
+                slug = p.get("slug")
+                if not slug:
+                    continue
+                products[slug] = {
+                    "name": (p.get("name") or slug).strip(),
+                    "permalink": p.get("permalink") or self.shop_url,
+                    "categories": [
+                        (c.get("slug") or "").lower()
+                        for c in p.get("categories", [])
+                    ],
+                    "in_stock": bool(p.get("is_in_stock", True)),
+                }
             try:
-                resp = http_get(session, page_url, ua, timeout)
-            except requests.HTTPError as e:
-                if e.response is not None and e.response.status_code == 404:
-                    break
-                raise
-            page_urls = set(self.PRODUCT_URL_RE.findall(resp.text))
-            new = page_urls - urls
-            if not new:
+                total_pages = int(resp.headers.get("X-WP-TotalPages", 1))
+            except (TypeError, ValueError):
+                total_pages = 1
+            if page >= total_pages:
                 break
-            urls |= new
+            page += 1
             time.sleep(0.4)
-        return {"product_urls": sorted(urls)}
+        if not products:
+            # Treat an empty catalog as a transient failure rather than wiping
+            # state -- re-seeding would silently drop real future alerts.
+            raise RuntimeError(
+                "store API returned no products; format may have changed"
+            )
+        return {"products": products}
+
+    def _targets_of(self, info):
+        return [c for c in info.get("categories", []) if c in self.target_categories]
 
     def diff(self, prev_state, current):
         now_iso = datetime.now(timezone.utc).isoformat()
-        prev_products = prev_state.get("products", {})
-        is_first_run = not prev_products
-        curr_urls = set(current.get("product_urls", []))
-        prev_urls = set(prev_products.keys())
+        products = current.get("products", {})
+        curr_target = {
+            slug for slug, info in products.items() if self._targets_of(info)
+        }
 
-        # Preserve ALL previously-seen products so that a product flickering
-        # off the listing page (transient caching, related-products rotation,
-        # etc.) does not get "forgotten" and re-alert when it reappears.
-        merged = dict(prev_products)
+        # `alerted` = slugs already alerted as a target-category product. Tier
+        # membership is recomputed every run, so a product moved into Top Shelf
+        # after it first appeared (or that dropped before being categorised)
+        # still alerts exactly once. Absence of the key marks pre-upgrade
+        # state: seed the current target members as already-handled (start
+        # clean) and carry forward anything the old keyword schema alerted, so
+        # the switch never re-fires on the existing catalog.
+        migrating = "alerted" not in prev_state
+        alerted = set(prev_state.get("alerted", []))
+        if migrating:
+            for url, v in prev_state.get("products", {}).items():
+                if isinstance(v, dict) and v.get("matched_kw"):
+                    alerted.add(v.get("slug") or url)
+
         alerts = []
-        new_urls = sorted(curr_urls - prev_urls)
-
-        for url in new_urls:
-            slug = self._slug_of(url)
-            if is_first_run:
-                merged[url] = {"slug": slug, "matched_kw": None, "checked": False}
-                continue
-            html_text = self._fetch_product_page(url)
-            matched = self._match_in_text(html_text)
-            merged[url] = {"slug": slug, "matched_kw": matched, "checked": True}
-            if matched:
-                display = slug.replace("-", " ").title()
+        if migrating:
+            alerted |= curr_target
+        else:
+            for slug in sorted(curr_target - alerted):
+                info = products[slug]
+                tier = self._targets_of(info)[0].replace("-", " ").title()
+                stock = "in stock" if info["in_stock"] else "currently sold out"
                 alerts.append({
                     "site": self.name, "label": self.label,
-                    "kind": "NEW_PRODUCT", "title": display,
-                    "url": url,
-                    "details": f'page contains "{matched}"',
+                    "kind": "NEW_PRODUCT", "title": info["name"],
+                    "url": info["permalink"],
+                    "details": f"new {tier} product ({stock})",
                 })
-            else:
-                logging.info(
-                    "[%s] new product %s suppressed: page does not contain %s",
-                    self.name, slug, self.keywords,
-                )
-            time.sleep(0.3)
+                alerted.add(slug)
 
-        return {"products": merged, "last_seen": now_iso}, alerts
+        new_state = {
+            "alerted": sorted(alerted),
+            "target_current": sorted(curr_target),
+            "last_seen": now_iso,
+        }
+        return new_state, alerts
 
 
 class BeleaferIndoorSite:
