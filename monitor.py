@@ -20,7 +20,7 @@ import ssl
 import sys
 import time
 import webbrowser
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -248,6 +248,102 @@ def http_get(session, url, ua, timeout, expect_json=False):
     resp.raise_for_status()
     resp.encoding = "utf-8"
     return resp
+
+
+# ---------- Shared re-check diff (late-signal-safe) ---------------------
+
+DEFAULT_RECHECK_WINDOW_HOURS = 8
+DEFAULT_MAX_RECHECKS_PER_RUN = 25
+
+
+def recheck_listing_diff(prev_state, curr_urls, now, *, evaluate,
+                         window_hours=DEFAULT_RECHECK_WINDOW_HOURS,
+                         max_per_run=DEFAULT_MAX_RECHECKS_PER_RUN):
+    """Diff for sites whose match signal lives on a separately-fetched detail
+    page and can appear AFTER the product is first listed.
+
+    The naive "check each product once when it first appears, then never
+    again" pattern silently drops a product whose qualifying signal (a type
+    designation, a tier, a keyword) is written to its detail page minutes or
+    hours after the product is listed. This helper instead re-checks a
+    not-yet-matched product on every run until it matches (alert once) or its
+    re-check window lapses -- after which an unmatched product is treated as
+    genuinely non-qualifying and is no longer refetched, bounding load to
+    recently-appeared products.
+
+    Args:
+        prev_state:  previously saved state dict for the site.
+        curr_urls:   iterable of product URLs currently in the listing.
+        now:         timezone-aware datetime for this run.
+        evaluate(url) -> (matched: bool, record: dict, alert: dict | None):
+            fetches/parses the detail page and decides whether it qualifies.
+            ``record`` is per-URL data to persist; ``alert`` is emitted when
+            matched.
+        window_hours: how long after first sighting to keep re-checking.
+        max_per_run:  cap on detail-page evaluations per run (load guard).
+
+    Returns ``(new_state, alerts)``. Per-URL state carries ``first_seen``,
+    ``alerted`` and ``checks``. Migration / first run (state lacks the schema
+    marker ``v == 2``) seeds the current listing as already-handled (start
+    clean) and emits no alerts.
+    """
+    prev = prev_state.get("products", {})
+    now_iso = now.isoformat()
+
+    if prev_state.get("v") != 2:
+        # Pre-upgrade or genuine first run: start clean. Everything currently
+        # known is marked handled so the switch never retro-alerts; only
+        # products that appear on a LATER run can fire.
+        seeded = {
+            url: {"first_seen": now_iso, "alerted": True, "checks": 0}
+            for url in (set(prev.keys()) | set(curr_urls))
+        }
+        return {"v": 2, "products": seeded, "last_seen": now_iso}, []
+
+    window = timedelta(hours=window_hours)
+    products = {}
+    alerts = []
+
+    # Carry forward products no longer listed so they never re-alert if they
+    # reappear later.
+    for url, rec in prev.items():
+        if url not in curr_urls:
+            products[url] = rec
+
+    # Decide which listed products still need (re)checking this run.
+    candidates = []
+    for url in curr_urls:
+        rec = dict(prev.get(url, {}))
+        rec.setdefault("first_seen", now_iso)
+        rec.setdefault("alerted", False)
+        rec.setdefault("checks", 0)
+        products[url] = rec
+        if rec["alerted"]:
+            continue
+        try:
+            within = (now - datetime.fromisoformat(rec["first_seen"])) <= window
+        except Exception:
+            within = True
+        if within:
+            candidates.append(url)
+        # else: window lapsed -- keep the record, stop refetching quietly.
+
+    # Prioritise least-checked (new products first), then oldest, and cap the
+    # detail fetches per run. Unprocessed candidates stay unalerted and within
+    # window, so they are picked up on a subsequent run.
+    candidates.sort(key=lambda u: (products[u]["checks"], products[u]["first_seen"]))
+    for url in candidates[:max_per_run]:
+        rec = products[url]
+        matched, record, alert = evaluate(url)
+        if record:
+            rec.update(record)
+        rec["checks"] = rec.get("checks", 0) + 1
+        if matched:
+            rec["alerted"] = True
+            if alert:
+                alerts.append(alert)
+
+    return {"v": 2, "products": products, "last_seen": now_iso}, alerts
 
 
 # ---------- Site adapters -----------------------------------------------
@@ -847,51 +943,39 @@ class BeleaferIndoorSite:
             time.sleep(0.4)
         return {"product_urls": sorted(urls)}
 
-    def diff(self, prev_state, current):
-        now_iso = datetime.now(timezone.utc).isoformat()
-        prev = prev_state.get("products", {})
-        is_first_run = not prev
-        curr_urls = set(current.get("product_urls", []))
-        prev_urls = set(prev.keys())
-
-        # Preserve all previously-seen products so a product flickering off
-        # the listing page does not re-trigger a NEW_PRODUCT alert later.
-        merged = dict(prev)
-        alerts = []
-        new_urls = sorted(curr_urls - prev_urls)
-
-        for url in new_urls:
-            slug = self._slug_of(url)
-            if is_first_run:
-                merged[url] = {"slug": slug, "types": [], "checked": False}
-                continue
-            html_text = self._fetch_product_page(url)
-            types_found = self._types_in_summary(html_text)
-            merged[url] = {
-                "slug": slug, "types": sorted(types_found), "checked": True,
+    def _evaluate(self, url):
+        slug = self._slug_of(url)
+        html_text = self._fetch_product_page(url)
+        types_found = self._types_in_summary(html_text)
+        if self.allowed_types is None:
+            matching = sorted(types_found)
+        else:
+            matching = sorted(types_found & self.allowed_types)
+        record = {"slug": slug, "types": sorted(types_found)}
+        time.sleep(0.3)
+        if matching:
+            display = slug.replace("-", " ").title()
+            kinds = ", ".join(f"Type {t}" for t in matching)
+            alert = {
+                "site": self.name, "label": self.label,
+                "kind": "NEW_PRODUCT", "title": display,
+                "url": url,
+                "details": f"description mentions {kinds}",
             }
-            if self.allowed_types is None:
-                matching = sorted(types_found)
-            else:
-                matching = sorted(types_found & self.allowed_types)
-            if matching:
-                display = slug.replace("-", " ").title()
-                kinds = ", ".join(f"Type {t}" for t in matching)
-                alerts.append({
-                    "site": self.name, "label": self.label,
-                    "kind": "NEW_PRODUCT", "title": display,
-                    "url": url,
-                    "details": f"description mentions {kinds}",
-                })
-            else:
-                logging.info(
-                    "[%s] new product %s suppressed: types=%s not in %s",
-                    self.name, slug, sorted(types_found),
-                    sorted(self.allowed_types) if self.allowed_types else "(any)",
-                )
-            time.sleep(0.3)
+            return True, record, alert
+        return False, record, None
 
-        return {"products": merged, "last_seen": now_iso}, alerts
+    def diff(self, prev_state, current):
+        # Re-check each not-yet-matched product's detail page every run (until
+        # it matches or the window lapses), so a "Type 2" designation added
+        # AFTER the product is first listed is not missed.
+        curr_urls = set(current.get("product_urls", []))
+        return recheck_listing_diff(
+            prev_state, curr_urls, datetime.now(timezone.utc),
+            evaluate=self._evaluate,
+            window_hours=self.cfg.get(
+                "recheck_window_hours", DEFAULT_RECHECK_WINDOW_HOURS),
+        )
 
 
 class HighAlpineGeneticsSite:
@@ -1023,58 +1107,42 @@ class HighAlpineGeneticsSite:
         return set(int(t) for t in self.TYPE_RE.findall(text or ""))
 
     def diff(self, prev_state, current):
-        now_iso = datetime.now(timezone.utc).isoformat()
-        prev = prev_state.get("products", {})
-        is_first_run = not prev
-        curr = current.get("results", {})
-        curr_urls = set(curr.keys())
-        prev_urls = set(prev.keys())
+        results = current.get("results", {})
+        curr_urls = set(results.keys())
 
-        # Preserve everything previously seen so listing flickers do not cause
-        # duplicate alerts when a product reappears later.
-        merged = dict(prev)
-        alerts = []
-        new_urls = sorted(curr_urls - prev_urls)
-
-        for url in new_urls:
-            name = curr.get(url, "")
-            if is_first_run:
-                merged[url] = {
-                    "name": name, "is_seed": None,
-                    "matched_types": [], "checked": False,
-                }
-                continue
+        def _evaluate(url):
+            name = results.get(url, "")
             html_text = self._fetch_detail(url)
             desc_text = self._description_text(html_text)
             is_seed = self._is_seed(name, desc_text)
-            types_in_name = self._types_in(name)
-            types_in_desc = self._types_in(desc_text)
-            all_types = sorted(types_in_name | types_in_desc)
-            merged[url] = {
-                "name": name,
-                "is_seed": is_seed,
-                "matched_types": all_types,
-                "checked": True,
+            types = self._types_in(name) | self._types_in(desc_text)
+            record = {
+                "name": name, "is_seed": is_seed,
+                "matched_types": sorted(types),
             }
+            time.sleep(0.3)
             if is_seed:
-                logging.info("[%s] %s suppressed (seed)", self.name, name)
-                time.sleep(0.3)
-                continue
-            matched = (types_in_name | types_in_desc) & self.allowed_types
+                return False, record, None
+            matched = types & self.allowed_types
             if matched:
                 kinds = ", ".join(f"Type {t}" for t in sorted(matched))
-                alerts.append({
+                alert = {
                     "site": self.name, "label": self.label,
                     "kind": "NEW_PRODUCT", "title": name,
-                    "url": url,
-                    "details": kinds,
-                })
-            else:
-                logging.info(
-                    "[%s] %s suppressed (no type 1/2)", self.name, name,
-                )
-            time.sleep(0.3)
-        return {"products": merged, "last_seen": now_iso}, alerts
+                    "url": url, "details": kinds,
+                }
+                return True, record, alert
+            return False, record, None
+
+        # Re-check each not-yet-matched product every run (until it matches or
+        # the window lapses) so a type designation that the vendor adds to the
+        # name/description after first listing the product is still caught.
+        return recheck_listing_diff(
+            prev_state, curr_urls, datetime.now(timezone.utc),
+            evaluate=_evaluate,
+            window_hours=self.cfg.get(
+                "recheck_window_hours", DEFAULT_RECHECK_WINDOW_HOURS),
+        )
 
 
 SITE_CLASSES = {
