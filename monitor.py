@@ -1260,11 +1260,24 @@ def email_alerts(all_alerts, cfg):
     prefix = cfg.get("email_subject_prefix", "[Drop Monitor]")
     subject = f"{prefix} {len(all_alerts)} alert(s) — {counts_by_site}"
     html_body, text_body = build_email_bodies(by_site, len(all_alerts))
-    try:
-        send_email(cfg, secrets, subject, html_body, text_body)
-        logging.warning("email sent to %s: %s", cfg["email_to"], subject)
-    except Exception as exc:
-        logging.error("email send failed: %s", exc)
+    # Retry transient SMTP failures (network blip, brief Gmail rate-limit) so a
+    # one-off hiccup does not drop a real alert. main() saves state right after
+    # this returns -- which suppresses re-alerting -- so the deliver-or-give-up
+    # decision has to be made here, not deferred to the next run.
+    attempts = max(1, int(cfg.get("email_retry_attempts", 3)))
+    for attempt in range(1, attempts + 1):
+        try:
+            send_email(cfg, secrets, subject, html_body, text_body)
+            logging.warning("email sent to %s: %s", cfg["email_to"], subject)
+            return True
+        except Exception as exc:
+            logging.error("email send attempt %d/%d failed: %s",
+                          attempt, attempts, exc)
+            if attempt < attempts:
+                time.sleep(min(2 ** attempt, 20))
+    logging.error("email send FAILED after %d attempts; %d alert(s) NOT "
+                  "delivered: %s", attempts, len(all_alerts), subject)
+    return False
 
 
 # ---------- Windows-only desktop alerts ---------------------------------
