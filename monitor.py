@@ -1246,13 +1246,15 @@ def send_email(cfg, secrets, subject, html_body, text_body):
 
 def email_alerts(all_alerts, cfg):
     if not cfg.get("email_enabled", False) or not all_alerts:
-        return
+        return True  # email intentionally off / nothing to deliver
     if not cfg.get("email_to"):
         logging.error("email_to not set (no EMAIL_TO env var or secrets entry); skipping email")
-        return
+        return False
     secrets = load_secrets()
     if not secrets:
-        return
+        logging.error("no SMTP secrets available; cannot deliver %d alert(s)",
+                      len(all_alerts))
+        return False
     by_site = {}
     for a in all_alerts:
         by_site.setdefault(a["label"], []).append(a)
@@ -1439,9 +1441,10 @@ def main():
         all_alerts.extend(alerts)
         summary_lines.append(f"{site.name}: {len(alerts)} alert(s)")
 
+    email_ok = True
     if all_alerts:
         desktop_alerts(all_alerts, cfg)
-        email_alerts(all_alerts, cfg)
+        email_ok = email_alerts(all_alerts, cfg)
 
     save_state(state)
     logging.info("=== run end: %d total alert(s); %s ===",
@@ -1451,20 +1454,26 @@ def main():
     # would cause GitHub Actions to spam failure emails on every blip.
     if any_fetch_failed:
         logging.info("(one or more sites had a transient fetch error; not failing the run)")
-    # Dead-man's-switch: ping the healthcheck URL on every completed run.
-    # If these pings stop (box dead, cron broken, network down), the
-    # healthcheck provider alerts the user from its own infrastructure.
-    ping_healthcheck()
+    # Dead-man's-switch + delivery signal: a healthy ping on every completed
+    # run (if pings stop -- box dead, cron broken, network down -- the provider
+    # alerts the user). If alert delivery just failed, ping /fail instead so the
+    # provider also notifies the user that a real drop could not be emailed.
+    ping_healthcheck(success=email_ok)
     return 0
 
 
-def ping_healthcheck():
+def ping_healthcheck(success=True):
     # Strip whitespace and any stray BOM that can sneak in via secret managers.
     url = os.environ.get("HEALTHCHECK_URL", "").strip().lstrip("﻿").strip()
     if not url.startswith("http"):
         return
+    # On delivery failure, ping the "/fail" endpoint so healthchecks.io flags
+    # the check down and notifies the user from ITS OWN infrastructure -- an
+    # alert path independent of the SMTP that just failed. A later healthy run
+    # pings the base URL and clears it.
+    target = url if success else url.rstrip("/") + "/fail"
     try:
-        requests.get(url, timeout=10)
+        requests.get(target, timeout=10)
     except Exception as exc:
         logging.warning("healthcheck ping failed: %s", exc)
 
