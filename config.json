@@ -75,5 +75,10 @@
     "allowed_types": [1, 2],
     "max_pages": 30,
     "min_interval_minutes": 5
+  },
+  "antheiafarms": {
+    "enabled": true,
+    "products_json_url": "https://antheiafarms.myshopify.com/collections/all/products.json?limit=250",
+    "collection_url": "https://antheiafarms.myshopify.com/collections/all"
   }
 }

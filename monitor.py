@@ -135,6 +135,11 @@ DEFAULT_CONFIG = {
         "max_pages": 30,
         "min_interval_minutes": 5,
     },
+    "antheiafarms": {
+        "enabled": True,
+        "products_json_url": "https://antheiafarms.myshopify.com/collections/all/products.json?limit=250",
+        "collection_url": "https://antheiafarms.myshopify.com/collections/all",
+    },
 }
 
 
@@ -1145,6 +1150,71 @@ class HighAlpineGeneticsSite:
         )
 
 
+class AntheiaFarmsSite:
+    """Shopify collection (antheiafarms.myshopify.com). Alerts when a product
+    becomes purchasable: an existing product's variant going sold-out ->
+    available (a restock / drop), or a brand-new product appearing already in
+    stock. Everything is sold out ahead of the scheduled drop, so the first
+    run only seeds and an availability transition is what fires later. A new
+    product that appears sold out is recorded silently and alerts when it
+    later flips available.
+    """
+    name = "antheiafarms"
+    label = "Antheia Farms"
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.product_url_base = cfg.get(
+            "product_url_base", "https://antheiafarms.myshopify.com/products/")
+
+    def fetch(self, session, ua, timeout):
+        resp = http_get(session, self.cfg["products_json_url"], ua, timeout,
+                        expect_json=True)
+        out = {}
+        for p in resp.json().get("products", []):
+            handle = p.get("handle")
+            if not handle:
+                continue
+            variants = p.get("variants", []) or []
+            out[handle] = {
+                "title": p.get("title", handle),
+                "any_available": any(v.get("available", False) for v in variants),
+            }
+        return out
+
+    def diff(self, prev_state, current):
+        now_iso = datetime.now(timezone.utc).isoformat()
+        prev = prev_state.get("products", {})
+        is_first_run = not prev
+        alerts = []
+        for handle, p in current.items():
+            url = self.product_url_base + handle
+            was = prev.get(handle)
+            if was is None:
+                # New product: alert only if it is already in stock (a fresh
+                # in-stock drop). A new sold-out product is recorded and will
+                # alert when it flips available. Never alert on the seed run.
+                if not is_first_run and p["any_available"]:
+                    alerts.append({
+                        "site": self.name, "label": self.label,
+                        "kind": "DROP", "title": p["title"],
+                        "url": url, "details": "new product, in stock",
+                    })
+                continue
+            if p["any_available"] and not was.get("any_available", False):
+                alerts.append({
+                    "site": self.name, "label": self.label,
+                    "kind": "RESTOCK", "title": p["title"],
+                    "url": url, "details": "back in stock",
+                })
+        # Preserve previously-seen handles so a product temporarily missing
+        # from the feed does not re-alert when it returns.
+        merged = dict(prev)
+        for handle, p in current.items():
+            merged[handle] = dict(p)
+        return {"products": merged, "last_seen": now_iso}, alerts
+
+
 SITE_CLASSES = {
     "typ3": Typ3Site,
     "hempbarn_livingsoil": HempBarnLivingSoilSite,
@@ -1154,6 +1224,7 @@ SITE_CLASSES = {
     "fiveleafwellness": FiveLeafWellnessSite,
     "beleafer_indoor": BeleaferIndoorSite,
     "highalpinegenetics": HighAlpineGeneticsSite,
+    "antheiafarms": AntheiaFarmsSite,
 }
 
 
