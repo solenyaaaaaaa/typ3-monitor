@@ -174,7 +174,7 @@
           "last_seen": "2026-05-31T06:38:15.385535+00:00"
         }
       },
-      "last_polled_at": "2026-08-01T07:14:16.433634+00:00"
+      "last_polled_at": "2026-08-01T07:15:19.925165+00:00"
     },
     "hempbarn_livingsoil": {
       "strains": [
@@ -227,8 +227,8 @@
         "Headband",
         "Sherb Star"
       ],
-      "last_seen": "2026-08-01T07:13:18.245246+00:00",
-      "last_polled_at": "2026-08-01T07:13:16.115857+00:00"
+      "last_seen": "2026-08-01T07:16:00.224998+00:00",
+      "last_polled_at": "2026-08-01T07:15:19.925165+00:00"
     },
     "caregiverpharms": {
       "products": {
@@ -281,8 +281,8 @@
           "smalls_available": false
         }
       },
-      "last_seen": "2026-08-01T07:14:19.080760+00:00",
-      "last_polled_at": "2026-08-01T07:14:16.433634+00:00"
+      "last_seen": "2026-08-01T07:16:00.481440+00:00",
+      "last_polled_at": "2026-08-01T07:15:19.925165+00:00"
     },
     "flowgardens_smalls": {
       "strains": [
@@ -417,8 +417,8 @@
         "White Cheddar - Type 4 (CBG)",
         "Wizard of OZ - Type 3 (CBD)"
       ],
-      "last_seen": "2026-08-01T07:14:19.265167+00:00",
-      "last_polled_at": "2026-08-01T07:14:16.433634+00:00"
+      "last_seen": "2026-08-01T07:16:00.647380+00:00",
+      "last_polled_at": "2026-08-01T07:15:19.925165+00:00"
     },
     "hempbarn_organicsoil": {
       "strains": [
@@ -482,8 +482,8 @@
         "Neon",
         "Tamalez"
       ],
-      "last_seen": "2026-08-01T07:13:18.304599+00:00",
-      "last_polled_at": "2026-08-01T07:13:16.115857+00:00"
+      "last_seen": "2026-08-01T07:16:00.265682+00:00",
+      "last_polled_at": "2026-08-01T07:15:19.925165+00:00"
     },
     "fiveleafwellness": {
       "alerted": [
@@ -493,8 +493,8 @@
         "triple-scoop-indoor-indica-hybrid"
       ],
       "target_current": [],
-      "last_seen": "2026-08-01T07:14:21.222253+00:00",
-      "last_polled_at": "2026-08-01T07:14:16.433634+00:00"
+      "last_seen": "2026-08-01T07:16:00.705436+00:00",
+      "last_polled_at": "2026-08-01T07:15:19.925165+00:00"
     },
     "beleafer_indoor": {
       "v": 2,
@@ -529,77 +529,12 @@
           "alerted": true,
           "checks": 0
         },
-        "https://beleafer.com/product/kush-colada-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/gaia-goo-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/sunset-sorbet-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/emo-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/blueberry-tart-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
         "https://beleafer.com/product/rainbow-sherbert-indoor/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
         },
-        "https://beleafer.com/product/4-strain-28g-sampler-indoor-flower/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/terra-fuel-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/milky-whey-cbg-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/kush-by-the-foot-7-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/lemdawg-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/gummy-breath-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/zebbles-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/hexxed-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/sunburst-indoor/": {
+        "https://beleafer.com/product/2-strain-28g-sampler-indoor-flower/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
@@ -609,22 +544,17 @@
           "alerted": true,
           "checks": 0
         },
-        "https://beleafer.com/product/martian-milk-indoor/": {
+        "https://beleafer.com/product/blueberry-tart-indoor/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
         },
-        "https://beleafer.com/product/4-strain-28g-sampler-indoor-flower-smalls/": {
+        "https://beleafer.com/product/hexxed-indoor/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
         },
-        "https://beleafer.com/product/pineapple-flookies-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/kush-by-the-foot-1-indoor/": {
+        "https://beleafer.com/product/kush-colada-indoor/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
@@ -638,22 +568,7 @@
             2
           ]
         },
-        "https://beleafer.com/product/8-strain-28g-sampler-indoor-flower/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/gas-muffinz-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/garlic-gooey-indoor/": {
-          "first_seen": "2026-06-19T20:16:20.399147+00:00",
-          "alerted": true,
-          "checks": 0
-        },
-        "https://beleafer.com/product/grape-goddess-indoor/": {
+        "https://beleafer.com/product/galaxies-indoor/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
@@ -663,12 +578,72 @@
           "alerted": true,
           "checks": 0
         },
-        "https://beleafer.com/product/lemonfade-indoor/": {
+        "https://beleafer.com/product/eleven-flookies-indoor/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
         },
-        "https://beleafer.com/product/blue-eyes-white-kush-indoor/": {
+        "https://beleafer.com/product/kush-by-the-foot-1-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/milky-whey-cbg-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/gaia-goo-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/grape-goddess-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/sunburst-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/8-strain-28g-sampler-indoor-flower/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/4-strain-28g-sampler-indoor-flower/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/garlic-gooey-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/pineapple-flookies-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/emo-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/4-strain-28g-sampler-indoor-flower-smalls/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/martian-milk-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/gas-muffinz-indoor/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
@@ -678,12 +653,32 @@
           "alerted": true,
           "checks": 0
         },
-        "https://beleafer.com/product/eleven-flookies-indoor/": {
+        "https://beleafer.com/product/sunset-sorbet-indoor/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
         },
-        "https://beleafer.com/product/galaxies-indoor/": {
+        "https://beleafer.com/product/terra-fuel-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/kush-by-the-foot-7-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/zebbles-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/blue-eyes-white-kush-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/gummy-breath-indoor/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
@@ -693,7 +688,12 @@
           "alerted": true,
           "checks": 0
         },
-        "https://beleafer.com/product/2-strain-28g-sampler-indoor-flower/": {
+        "https://beleafer.com/product/lemonfade-indoor/": {
+          "first_seen": "2026-06-19T20:16:20.399147+00:00",
+          "alerted": true,
+          "checks": 0
+        },
+        "https://beleafer.com/product/lemdawg-indoor/": {
           "first_seen": "2026-06-19T20:16:20.399147+00:00",
           "alerted": true,
           "checks": 0
@@ -704,8 +704,8 @@
           "checks": 0
         }
       },
-      "last_seen": "2026-08-01T07:10:18.344961+00:00",
-      "last_polled_at": "2026-08-01T07:10:13.933786+00:00"
+      "last_seen": "2026-08-01T07:16:02.348847+00:00",
+      "last_polled_at": "2026-08-01T07:15:19.925165+00:00"
     },
     "highalpinegenetics": {
       "v": 2,
@@ -1916,8 +1916,8 @@
           "checks": 0
         }
       },
-      "last_seen": "2026-08-01T07:10:18.777850+00:00",
-      "last_polled_at": "2026-08-01T07:10:13.933786+00:00"
+      "last_seen": "2026-08-01T07:16:02.736959+00:00",
+      "last_polled_at": "2026-08-01T07:15:19.925165+00:00"
     },
     "antheiafarms": {
       "products": {
@@ -1962,9 +1962,9 @@
           "any_available": false
         }
       },
-      "last_seen": "2026-08-01T07:14:21.499802+00:00",
-      "last_polled_at": "2026-08-01T07:14:16.433634+00:00"
+      "last_seen": "2026-08-01T07:16:02.974172+00:00",
+      "last_polled_at": "2026-08-01T07:15:19.925165+00:00"
     }
   },
-  "last_run": "2026-08-01T07:14:21.499835+00:00"
+  "last_run": "2026-08-01T07:16:02.974205+00:00"
 }
