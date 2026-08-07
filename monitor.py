@@ -628,16 +628,26 @@ class CaregiverPharmsSite:
             any_available = any(v.get("available", False) for v in variants)
             smalls_variant_present = False
             smalls_variant_available = False
+            variant_map = {}
             for v in variants:
                 if self._is_smalls_variant(v.get("title")):
                     smalls_variant_present = True
                     if v.get("available", False):
                         smalls_variant_available = True
+                vtitle = (v.get("title") or "").strip() or "Default"
+                variant_map[vtitle] = bool(v.get("available", False))
             out[p["handle"]] = {
                 "title": p.get("title", p["handle"]),
                 "any_available": any_available,
                 "smalls_present": smalls_variant_present,
                 "smalls_available": smalls_variant_available,
+                # Per-variant availability. `any_available` alone cannot detect
+                # a restock on a product that keeps one slow-moving variant
+                # (e.g. the $265 Baller Ounce) permanently in stock: the
+                # aggregate never goes False, so it can never transition back
+                # to True. Blueberry Chem #23 was invisible for exactly this
+                # reason on 2026-08-06.
+                "variants": variant_map,
             }
         return out
 
@@ -661,12 +671,30 @@ class CaregiverPharmsSite:
                 })
                 continue
             was = prev[handle]
-            if p["any_available"] and not was.get("any_available", False):
-                alerts.append({
-                    "site": self.name, "label": self.label,
-                    "kind": "RESTOCK", "title": p["title"],
-                    "url": url, "details": "back in stock",
-                })
+            prev_variants = was.get("variants")
+            if prev_variants is None:
+                # Product predates per-variant tracking. Seed its variant map
+                # this run without alerting, otherwise the switchover fires an
+                # alert for every currently-available size on every product.
+                pass
+            else:
+                newly_available = []
+                for vtitle, avail in p["variants"].items():
+                    if not avail:
+                        continue
+                    if self._is_smalls_variant(vtitle):
+                        # Has its own SMALLS_BACK alert below; skip here so a
+                        # smalls restock does not emit two alerts.
+                        continue
+                    if not prev_variants.get(vtitle, False):
+                        newly_available.append(vtitle)
+                if newly_available:
+                    alerts.append({
+                        "site": self.name, "label": self.label,
+                        "kind": "RESTOCK", "title": p["title"],
+                        "url": url,
+                        "details": "back in stock: " + ", ".join(newly_available),
+                    })
             if p["smalls_available"] and not was.get("smalls_available", False):
                 alerts.append({
                     "site": self.name, "label": self.label,
@@ -1176,9 +1204,16 @@ class AntheiaFarmsSite:
             if not handle:
                 continue
             variants = p.get("variants", []) or []
+            variant_map = {}
+            for v in variants:
+                vtitle = (v.get("title") or "").strip() or "Default"
+                variant_map[vtitle] = bool(v.get("available", False))
             out[handle] = {
                 "title": p.get("title", handle),
                 "any_available": any(v.get("available", False) for v in variants),
+                # See CaregiverPharmsSite.fetch: an aggregate availability flag
+                # misses a restock whenever one variant stays in stock.
+                "variants": variant_map,
             }
         return out
 
@@ -1201,11 +1236,20 @@ class AntheiaFarmsSite:
                         "url": url, "details": "new product, in stock",
                     })
                 continue
-            if p["any_available"] and not was.get("any_available", False):
+            prev_variants = was.get("variants")
+            if prev_variants is None:
+                # Predates per-variant tracking: seed silently this run.
+                continue
+            newly_available = [
+                vtitle for vtitle, avail in p["variants"].items()
+                if avail and not prev_variants.get(vtitle, False)
+            ]
+            if newly_available:
                 alerts.append({
                     "site": self.name, "label": self.label,
                     "kind": "RESTOCK", "title": p["title"],
-                    "url": url, "details": "back in stock",
+                    "url": url,
+                    "details": "back in stock: " + ", ".join(newly_available),
                 })
         # Preserve previously-seen handles so a product temporarily missing
         # from the feed does not re-alert when it returns.
