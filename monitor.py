@@ -676,32 +676,35 @@ class CaregiverPharmsSite:
                 # Product predates per-variant tracking. Seed its variant map
                 # this run without alerting, otherwise the switchover fires an
                 # alert for every currently-available size on every product.
-                pass
-            else:
-                newly_available = []
-                for vtitle, avail in p["variants"].items():
-                    if not avail:
-                        continue
-                    if self._is_smalls_variant(vtitle):
-                        # Has its own SMALLS_BACK alert below; skip here so a
-                        # smalls restock does not emit two alerts.
-                        continue
-                    if not prev_variants.get(vtitle, False):
-                        newly_available.append(vtitle)
-                if newly_available:
+                # The legacy product-level smalls check still runs so a smalls
+                # restock is not missed on the single seeding run.
+                if p["smalls_available"] and not was.get("smalls_available", False):
                     alerts.append({
                         "site": self.name, "label": self.label,
-                        "kind": "RESTOCK", "title": p["title"],
+                        "kind": "SMALLS_BACK", "title": p["title"],
                         "url": url,
-                        "details": "back in stock: " + ", ".join(newly_available),
+                        "details": "smalls/micros variant available",
                     })
-            if p["smalls_available"] and not was.get("smalls_available", False):
-                alerts.append({
-                    "site": self.name, "label": self.label,
-                    "kind": "SMALLS_BACK", "title": p["title"],
-                    "url": url,
-                    "details": "smalls/micros variant available",
-                })
+                continue
+            newly_available = [
+                vtitle for vtitle, avail in p["variants"].items()
+                if avail and not prev_variants.get(vtitle, False)
+            ]
+            if not newly_available:
+                continue
+            # Exactly one alert per product per run, however many variants came
+            # back. Several variants of one product returning is one event, not
+            # several. Smalls keeps its own highlighted kind when it is part of
+            # the batch, so that signal is not lost to the merge.
+            kind = ("SMALLS_BACK"
+                    if any(self._is_smalls_variant(v) for v in newly_available)
+                    else "RESTOCK")
+            alerts.append({
+                "site": self.name, "label": self.label,
+                "kind": kind, "title": p["title"],
+                "url": url,
+                "details": "back in stock: " + ", ".join(newly_available),
+            })
         # Preserve previously-seen handles to prevent re-alerts when a
         # product temporarily disappears from the collection JSON.
         merged_products = dict(prev)
