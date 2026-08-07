@@ -111,6 +111,35 @@ gh workflow run test-email.yml -R solenyaaaaaaa/typ3-monitor   # from cloud
 
 If you ever rotate the Gmail App Password: update both `%APPDATA%\typ3-monitor\secrets.json` (local) and the GitHub repo secret (`gh secret set SMTP_PASSWORD --body <new>`).
 
+## Design invariant: never aggregate availability across variants (2026-08-07)
+
+A per-product "is anything in stock" boolean cannot detect a restock. If a
+product keeps even one slow-moving variant permanently in stock, the aggregate
+never goes False, so it can never transition back to True, so no RESTOCK ever
+fires — no matter how many other sizes sell out and return.
+
+This shipped as a real miss. On 2026-08-06 23:53 UTC, Caregiver Pharms dropped
+Blueberry Chem #7 and #23 one second apart. #7 alerted; #23 did not. #7 had gone
+fully sold out earlier that day, so its aggregate flag had a False to return
+from. #23 had held its `1 Oz. (28g) Baller Ounce - All Top Colas` variant in
+stock continuously since at least 08-01 (verified across 291 sampled `state.json`
+commits), so its 3.5g / 14g / 28g restock was invisible. Four of the six products
+in that feed carried an in-stock Baller Ounce and were equally blind.
+
+`CaregiverPharmsSite` and `AntheiaFarmsSite` now store `variants: {title: bool}`
+and alert when any individual variant goes sold-out to available, naming the
+sizes. `any_available` is retained only for NEW_PRODUCT wording.
+
+Rules for any future site class:
+- Alert on the finest-grained availability signal the feed exposes. Never
+  `any()` a list of variants into one boolean and diff that.
+- When the shape of a stored state entry changes, seed the new field on first
+  sight without alerting, or the deploy emits an alert for every currently
+  available item. Both classes above do this by treating a missing `variants`
+  key as "seed silently this run."
+- Keep dedicated alert kinds (e.g. `SMALLS_BACK`) out of the generic per-variant
+  path so one event does not emit two emails.
+
 ## Known caveats
 
 - **GitHub Actions cron timing is not exact.** Scheduled workflows can be delayed up to ~10–15 min during peak GitHub load. Average is much closer to 5 min. For drop monitoring this trades worst-case timing slippage for 24/7 coverage that does not depend on this PC.
