@@ -489,29 +489,73 @@ class HempBarnSite:
                 k.lower() for k in cfg["description_keywords"]
             ]
 
+    # A strain heading is a <strong> that OPENS its own paragraph. Bold text
+    # used mid-sentence (the page carries <strong>"Top Tier"</strong> inside
+    # the intro paragraph) is not a heading and must never end a description.
+    HEADING_RE = re.compile(
+        r'<p[^>]*>\s*<strong>(.*?)</strong>', re.DOTALL | re.IGNORECASE
+    )
+    ANY_STRONG_RE = re.compile(r'<strong>(.*?)</strong>', re.DOTALL | re.IGNORECASE)
+
+    @staticmethod
+    def _clean(fragment):
+        text = re.sub(r"<[^>]+>", " ", fragment)
+        text = htmllib.unescape(text)
+        text = text.replace("\xa0", " ")
+        return re.sub(r"\s+", " ", text).strip()
+
+    @classmethod
+    def _match_strain(cls, heading_text, strains):
+        """Which dropdown strain, if any, does this heading introduce?
+
+        Headings carry genetics the dropdown does not ("Soul Assassin" ->
+        "Soul Assassin OG (Sour Diesel x OG Kush Pheno)"), so match on prefix
+        with a word boundary. Longest match wins so a strain whose name is a
+        prefix of another cannot steal the heading.
+        """
+        h = heading_text.lower()
+        best = None
+        for strain in strains:
+            s = strain.lower()
+            if not s or not h.startswith(s):
+                continue
+            if len(h) > len(s) and h[len(s)].isalnum():
+                continue  # mid-word: "M1 OG" must not match a "M1 OGX" heading
+            if best is None or len(strain) > len(best):
+                best = strain
+        return best
+
     @classmethod
     def _extract_descriptions(cls, html_text, strains):
         m = cls.SHORT_DESC_RE.search(html_text)
         if not m:
             return {}
         block = m.group(1)
-        positions = []
-        for strain in strains:
-            pat = re.compile(
-                r'<strong>\s*' + re.escape(strain) + r'\b[^<]*</strong>',
-                re.IGNORECASE,
-            )
-            for sm in pat.finditer(block):
-                positions.append((sm.start(), sm.end(), strain))
-        positions.sort()
+        # EVERY paragraph-leading heading is a boundary, not only the ones for
+        # strains currently in the dropdown. A strain that sells out is dropped
+        # from the dropdown but its heading stays on the page; if such an
+        # orphan does not terminate the preceding chunk, the preceding strain
+        # absorbs its write-up. That is exactly how "Snozzberries" swallowed
+        # G-Chem's "10/10" and fired a false NEW_STRAIN alert on 2026-08-25.
+        boundaries = [
+            (hm.start(), hm.end(), cls._clean(hm.group(1)))
+            for hm in cls.HEADING_RE.finditer(block)
+        ]
+        if len(boundaries) < 2:
+            # Markup changed shape; fall back to treating any <strong> as a
+            # boundary rather than emitting one giant merged description.
+            boundaries = [
+                (hm.start(), hm.end(), cls._clean(hm.group(1)))
+                for hm in cls.ANY_STRONG_RE.finditer(block)
+            ]
+        boundaries.sort()
         descs = {}
-        for i, (start, end, strain) in enumerate(positions):
-            nxt = positions[i + 1][0] if i + 1 < len(positions) else len(block)
-            chunk = block[end:nxt]
-            text = re.sub(r"<[^>]+>", " ", chunk)
-            text = htmllib.unescape(text)
-            text = text.replace("\xa0", " ")
-            text = re.sub(r"\s+", " ", text).strip()
+        for i, (h_start, h_end, h_text) in enumerate(boundaries):
+            strain = cls._match_strain(h_text, strains)
+            if strain is None:
+                continue  # orphan or non-strain heading: acts as a boundary only
+            nxt = boundaries[i + 1][0] if i + 1 < len(boundaries) else len(block)
+            text = cls._clean(block[h_end:nxt])
             if strain not in descs or len(text) > len(descs[strain]):
                 descs[strain] = text
         return descs
@@ -542,10 +586,21 @@ class HempBarnSite:
         prev_strains = set(prev_state.get("strains", []))
         curr_strains = set(current.get("strains", []))
         descriptions = current.get("descriptions", {})
-        # Merge descriptions so a strain keeps its best-known description even
-        # if one run fails to re-extract it. Preserve all previously-seen
-        # strains so one falling off the dropdown does not re-alert later.
+        # Preserve all previously-seen strains so one falling off the dropdown
+        # does not re-alert later.
         merged_descriptions = dict(prev_state.get("descriptions", {}))
+        if descriptions:
+            # The parse produced results, so it is authoritative for every
+            # strain currently on the page. Drop stale text for on-page
+            # strains rather than merging over it: a description captured by
+            # an older, buggy parser (one that absorbed the next strain's
+            # write-up) would otherwise survive the fix and keep matching
+            # forever, and a dropdown strain whose heading is missing from the
+            # page would keep matching on text that is not its own.
+            # An empty parse means the page or its markup failed to load, so
+            # in that case keep every prior description untouched.
+            for strain in curr_strains:
+                merged_descriptions.pop(strain, None)
         merged_descriptions.update(descriptions)
 
         is_first_run = not prev_strains
@@ -567,6 +622,13 @@ class HempBarnSite:
         else:
             for strain in sorted(curr_strains - alerted):
                 if self.description_keywords:
+                    if not descriptions:
+                        # The description block did not parse this run, so we
+                        # have no fresh evidence about any strain. Matching
+                        # against stored text here would let a stale or
+                        # previously mis-parsed description fire an alert on a
+                        # run that actually read nothing. Wait for a good run.
+                        continue
                     desc_lower = merged_descriptions.get(strain, "").lower()
                     matched = next(
                         (kw for kw in self.description_keywords if kw in desc_lower),
