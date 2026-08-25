@@ -140,6 +140,39 @@ Rules for any future site class:
 - Keep dedicated alert kinds (e.g. `SMALLS_BACK`) out of the generic per-variant
   path so one event does not emit two emails.
 
+## Design invariant: chunk boundaries must not depend on the current catalog (2026-08-25)
+
+Hemp Barn descriptions are one block of `<p><strong>Strain (genetics)</strong>text</p>`
+paragraphs. The parser split that block by looking for the headings of strains
+currently in the variations dropdown, and ran each chunk to the next such
+heading. That is wrong whenever the page contains a heading the dropdown does
+not: a strain that sells out leaves the dropdown while its heading stays on the
+page, so it stops acting as a boundary and the strain above it swallows its
+write-up.
+
+That shipped a false positive. On 2026-08-25 "Snozzberries" alerted with
+`matched keyword "10/10"`. The 10/10 belongs to G-Chem, which had sold out and
+left the dropdown; Snozzberries' parsed description was 443 characters instead
+of its real 200 and ended inside G-Chem's paragraph. G-Chem itself had alerted
+correctly weeks earlier while still in the dropdown, which is why the corruption
+only surfaced after it sold out.
+
+Boundaries are now every paragraph-leading `<strong>`, independent of the
+dropdown. A heading matching no current strain is a boundary that yields no
+description. Bold used mid-sentence is not a boundary.
+
+Rules for any future parser:
+- Derive chunk boundaries from the document's own structure, never from a list
+  of things you currently care about. The page will always contain more than
+  your catalog.
+- A value parsed this run is authoritative for anything currently on the page.
+  Do not merge stale text over it, or a bug fixed in the parser lives on in
+  `state.json` and keeps firing.
+- If a parse yields nothing, skip evaluation for that run rather than falling
+  back to stored values. A run that read nothing must not be able to alert.
+- Test with a fixture that includes a heading absent from the catalog and bold
+  text used mid-sentence. Both are in the real page and both broke this parser.
+
 ## Known caveats
 
 - **GitHub Actions cron timing is not exact.** Scheduled workflows can be delayed up to ~10–15 min during peak GitHub load. Average is much closer to 5 min. For drop monitoring this trades worst-case timing slippage for 24/7 coverage that does not depend on this PC.
