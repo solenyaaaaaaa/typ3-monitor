@@ -50,10 +50,10 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
-          # TEMPORARY: 300s while the handoff chain is being validated, so a
-          # broken handoff shows up in minutes instead of 5.5 hours. Raise to
-          # 19800 once a few handoffs have been observed.
-          LOOP_SECONDS: "300"
+          # 5h30m, inside the 6h job ceiling with room for checkout, setup and
+          # handoff. Validated at 300s first: runs 157322-157325 each dispatched
+          # their successor cleanly, and a changeover costs ~15s of cadence.
+          LOOP_SECONDS: "19800"
           POLL_INTERVAL: "60"
         run: bash .github/scripts/poll_loop.sh
 
