@@ -1,21 +1,37 @@
 name: TYP3 Drop Monitor
 
 on:
+  # Watchdog, not the primary trigger. The loop hands off to the next run as it
+  # exits (see .github/scripts/handoff.sh); this exists to restart the chain if
+  # a run ever dies without handing off. GitHub deprioritises cron heavily on
+  # this repo -- measured 2026-08-28..31, it fired 17 times in 3 days, gaps of
+  # 2h to 7.6h -- so it is a recovery mechanism, never the thing you rely on.
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 permissions:
-  contents: write
+  contents: write   # commit state.json back to main
+  actions: write    # dispatch the next loop from handoff.sh
 
-# No concurrency block on purpose: GitHub would auto-cancel queued runs when
-# the runner pool slows down, producing "No jobs were run" failure emails.
-# The git push step retries with rebase, so parallel runs are safe.
+# Exactly one loop at a time.
+#
+# cancel-in-progress is false on purpose: a watchdog firing mid-loop must not
+# kill the live loop. It queues instead, and GitHub starts it the moment the
+# running loop exits -- which doubles as a second handoff path. Only *pending*
+# runs get superseded, and a superseded run is marked cancelled, not failed, so
+# this does not reproduce the "No jobs were run" failure email the old
+# concurrency block caused (it used the default cancel-in-progress).
+concurrency:
+  group: drop-monitor-loop
+  cancel-in-progress: false
 
 jobs:
   poll:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Loop runs 5h30m; the rest is headroom for checkout, setup and handoff.
+    # GitHub's hard ceiling for a job is 6h.
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +42,7 @@ jobs:
       - name: Install dependencies
         run: pip install --quiet requests
 
-      - name: Run monitor
+      - name: Poll loop
         env:
           SMTP_HOST: smtp.gmail.com
           SMTP_PORT: "465"
@@ -34,41 +50,18 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
-        run: python monitor.py
+          # TEMPORARY: 300s while the handoff chain is being validated, so a
+          # broken handoff shows up in minutes instead of 5.5 hours. Raise to
+          # 19800 once a few handoffs have been observed.
+          LOOP_SECONDS: "300"
+          POLL_INTERVAL: "60"
+        run: bash .github/scripts/poll_loop.sh
 
-      - name: Commit updated state
-        run: |
-          if git diff --quiet -- state.json; then
-            echo "state unchanged"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add state.json
-          git commit -m "state: update [skip ci]"
-          # Retry push up to 4 times with rebase, to absorb:
-          #  - races with concurrent runs ("fetch first")
-          #  - GitHub git-server hiccups (5xx, exit 128)
-          # Disable bash -e for the loop: every command in the loop is
-          # allowed to fail without killing the step. We handle outcomes
-          # explicitly via the if/then on git push.
-          set +e
-          for attempt in 1 2 3 4; do
-            git push 2>&1
-            if [ $? -eq 0 ]; then
-              echo "pushed on attempt $attempt"
-              exit 0
-            fi
-            echo "push attempt $attempt failed; rebasing and retrying..."
-            git fetch origin main
-            git rebase origin/main
-            if [ $? -ne 0 ]; then
-              echo "rebase conflict, aborting"
-              git rebase --abort
-            fi
-            sleep $((attempt * 3))
-          done
-          echo "::warning::failed to push state.json after 4 attempts; will retry on next run"
-          # Exit 0 anyway: state will be re-derived on the next run.
-          # Real alerts (if any) were already emailed before this step.
-          exit 0
+      - name: Hand off to the next loop
+        # Runs even if the loop step failed, because a broken loop is exactly
+        # when the next one matters most. Skipped on cancellation: a cancelled
+        # run means another run is already taking over.
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/handoff.sh
