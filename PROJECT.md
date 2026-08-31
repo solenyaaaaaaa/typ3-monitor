@@ -2,15 +2,18 @@
 
 Polls a configured list of cannabis storefronts every minute and emails on drops, restocks, and new variant options.
 
-## Architecture (as of 2026-05-29)
+## Architecture (as of 2026-08-31)
 
-**Trigger:** Google Cloud Scheduler job `drop-monitor-trigger` (project `drop-monitor-497817`, region `us-central1`, schedule `* * * * *`) POSTs to GitHub `workflow_dispatch` every minute. Free tier (1 of 3 free jobs). Replaced cron-job.org, which silently auto-disabled itself on 2026-05-26 and caused a missed drop.
-**Backup trigger:** GitHub Actions native `schedule: */5` left ON for defense-in-depth.
+**Trigger:** none. The workflow triggers itself. `.github/workflows/poll.yml` runs a single job that polls in a loop (`.github/scripts/poll_loop.sh`, 5h30m at 60s intervals) and dispatches its own successor as it exits (`.github/scripts/handoff.sh`). `workflow_dispatch` is a documented exception to GitHub's rule that `GITHUB_TOKEN` cannot trigger workflows, so the handoff needs no PAT and there is no credential to expire. Requires `permissions: actions: write`.
+**Watchdog:** GitHub Actions native `schedule: */5` restarts the chain if a run dies without handing off. It is NOT the primary trigger and must never be relied on as one - measured 2026-08-28..31, GitHub fired it 17 times in 3 days with gaps of 2h to 7.6h. It earns its place because it needs no token, so it cannot fail for the same reason the handoff would.
+**Concurrency:** group `drop-monitor-loop`, `cancel-in-progress: false`. Exactly one loop alive; a watchdog firing mid-loop queues instead of killing it, and GitHub starts the queued run the moment the loop exits, which doubles as a second handoff path. Do NOT set `cancel-in-progress: true` - that is the config that caused "No jobs were run" failure emails in May.
+
+**Why no external scheduler:** the every-minute trigger died twice, both times because a free third party went away silently. cron-job.org auto-disabled itself 2026-05-26. Google Cloud Scheduler (`drop-monitor-trigger`, project `drop-monitor-497817`) stopped 2026-08-28 17:49 UTC when the GCP free trial expired, and went unnoticed for 3 days at 0.40% coverage. Its logs showed dispatches returning 204 right up to the end, so nothing was misconfigured - the service was simply switched off underneath it. Adding a better third-party scheduler would not fix the class of failure; removing the dependency does.
 **Runner:** GitHub Actions (public repo `solenyaaaaaaa/typ3-monitor`, unlimited free minutes) runs `monitor.py`.
 **Failure detection:** healthchecks.io dead-man's-switch. `monitor.py` pings `HEALTHCHECK_URL` (repo secret) every run; if pings stop ~15 min, healthchecks.io emails shlomotess@gmail.com from its own infra. This is what was missing when cron-job.org died silently.
 **Cost:** $0. (A GCP VM was rejected because the required external IP costs ~$3/mo.)
 
-To manage the trigger you need `gcloud` authed as shlomotess@gmail.com — see SYSTEM-MODS.md (2026-05-29 entry) for pause/resume/inspect commands.
+Nothing outside GitHub needs managing. To pause polling, disable the workflow; to resume, re-enable it and dispatch it once to restart the chain (the watchdog would also restart it, just slower). The old Cloud Scheduler job and its GCP project are no longer used.
 
 ## Status — 2026-05-06
 
