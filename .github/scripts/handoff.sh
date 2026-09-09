@@ -29,8 +29,5 @@ for attempt in 1 2 3; do
   sleep $(( attempt * 5 ))
 done
 
-# Do not fail the job over this. A failed handoff costs coverage until the
-# scheduled watchdog fires; failing the run would additionally spam GitHub
-# failure email for something the watchdog already handles.
-echo "::warning::handoff failed after 3 attempts; waiting on the scheduled watchdog to restart the loop"
-exit 0
+echo "::error::handoff failed after 3 attempts; waiting on the scheduled watchdog to restart the loop"
+exit 1

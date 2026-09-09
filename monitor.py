@@ -66,6 +66,10 @@ DEFAULT_CONFIG = {
     "play_sound": True,
     "open_browser_on_alert": True,
     "max_browser_tabs_per_run": 5,
+    # A single failed request is ordinary internet noise. Consecutive real
+    # failures are stored separately from catalog state so they can make the
+    # monitor unhealthy without stopping the other sites from being checked.
+    "site_failure_threshold": 3,
     "typ3": {
         "enabled": True,
         "collection_urls": [
@@ -213,6 +217,34 @@ def save_state(state):
     tmp = STATE_PATH.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
     tmp.replace(STATE_PATH)
+
+
+def record_site_failure(state, site_name, exc, threshold):
+    """Record one attempted fetch/diff failure and return its capped count."""
+    failures = state.setdefault("health", {}).setdefault("site_failures", {})
+    previous = failures.get(site_name, {})
+    count = min(int(previous.get("count", 0)) + 1, threshold)
+    failures[site_name] = {
+        "count": count,
+        "last_error": str(exc)[:300],
+        "last_failed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    return count
+
+
+def clear_site_failure(state, site_name):
+    """Clear a site's failure record after a successful fetch and diff."""
+    state.setdefault("health", {}).setdefault("site_failures", {}).pop(site_name, None)
+
+
+def persistent_site_failures(state, threshold, active_site_names):
+    failures = state.setdefault("health", {}).setdefault("site_failures", {})
+    for site_name in set(failures) - set(active_site_names):
+        failures.pop(site_name)
+    return {
+        name: entry for name, entry in failures.items()
+        if int(entry.get("count", 0)) >= threshold
+    }
 
 
 def load_secrets():
@@ -1566,7 +1598,7 @@ def main():
 
     all_alerts = []
     summary_lines = []
-    any_fetch_failed = False
+    failure_threshold = max(1, int(cfg.get("site_failure_threshold", 3)))
 
     now_utc = datetime.now(timezone.utc)
     for site in sites:
@@ -1592,16 +1624,23 @@ def main():
             current = site.fetch(session, ua, timeout)
         except Exception as exc:
             logging.error("[%s] fetch failed: %s", site.name, exc)
-            summary_lines.append(f"{site.name}: FETCH FAILED ({exc})")
-            any_fetch_failed = True
+            count = record_site_failure(state, site.name, exc, failure_threshold)
+            summary_lines.append(
+                f"{site.name}: FETCH FAILED ({count}/{failure_threshold}: {exc})"
+            )
             continue
 
         try:
             new_state, alerts = site.diff(prev, current)
         except Exception as exc:
             logging.error("[%s] diff failed: %s", site.name, exc)
-            summary_lines.append(f"{site.name}: DIFF FAILED ({exc})")
+            count = record_site_failure(state, site.name, exc, failure_threshold)
+            summary_lines.append(
+                f"{site.name}: DIFF FAILED ({count}/{failure_threshold}: {exc})"
+            )
             continue
+
+        clear_site_failure(state, site.name)
 
         # Record the poll time so the next run can apply throttling.
         new_state["last_polled_at"] = now_utc.isoformat()
@@ -1626,36 +1665,51 @@ def main():
         desktop_alerts(all_alerts, cfg)
         email_ok = email_alerts(all_alerts, cfg)
 
+    persistent_failures = persistent_site_failures(
+        state, failure_threshold, {site.name for site in sites}
+    )
+    unhealthy = bool(persistent_failures) or not email_ok
+    state.setdefault("health", {})["unhealthy"] = unhealthy
+    if persistent_failures:
+        diagnostics = ", ".join(
+            f"{name} ({entry['count']} consecutive: {entry['last_error']})"
+            for name, entry in persistent_failures.items()
+        )
+        summary_lines.append(f"HEALTH UNHEALTHY: {diagnostics}")
+
     save_state(state)
     logging.info("=== run end: %d total alert(s); %s ===",
                  len(all_alerts), "; ".join(summary_lines))
-    # Always exit 0. Per-site fetch failures are normal transient noise
-    # at 1-min cadence; logging them is enough. Returning non-zero here
-    # would cause GitHub Actions to spam failure emails on every blip.
-    if any_fetch_failed:
-        logging.info("(one or more sites had a transient fetch error; not failing the run)")
-    # Dead-man's-switch + delivery signal: a healthy ping on every completed
-    # run (if pings stop -- box dead, cron broken, network down -- the provider
-    # alerts the user). If alert delivery just failed, ping /fail instead so the
-    # provider also notifies the user that a real drop could not be emailed.
-    ping_healthcheck(success=email_ok)
-    return 0
+    # Healthchecks owns down/up notification deduplication. Repeating /fail
+    # while a site remains unhealthy also avoids a lost first signal masking a
+    # persistent error. Healthy completions retain the dead-man's-switch ping.
+    health_ok = ping_healthcheck(success=not unhealthy)
+    return 0 if not unhealthy and health_ok is not False else 1
 
 
 def ping_healthcheck(success=True):
     # Strip whitespace and any stray BOM that can sneak in via secret managers.
     url = os.environ.get("HEALTHCHECK_URL", "").strip().lstrip("﻿").strip()
-    if not url.startswith("http"):
-        return
+    if not url:
+        return None
+    if not url.startswith(("http://", "https://")):
+        logging.warning("healthcheck URL is invalid")
+        return False
     # On delivery failure, ping the "/fail" endpoint so healthchecks.io flags
     # the check down and notifies the user from ITS OWN infrastructure -- an
     # alert path independent of the SMTP that just failed. A later healthy run
     # pings the base URL and clears it.
     target = url if success else url.rstrip("/") + "/fail"
     try:
-        requests.get(target, timeout=10)
+        response = requests.get(target, timeout=10)
+        response.raise_for_status()
+        return True
     except Exception as exc:
-        logging.warning("healthcheck ping failed: %s", exc)
+        response = getattr(exc, "response", None)
+        status = getattr(response, "status_code", None)
+        detail = f"HTTP {status}" if status else type(exc).__name__
+        logging.warning("healthcheck ping failed (%s)", detail)
+        return False
 
 
 if __name__ == "__main__":
