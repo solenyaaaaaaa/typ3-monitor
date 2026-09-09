@@ -178,6 +178,46 @@ Rules for any future parser:
 - Test with a fixture that includes a heading absent from the catalog and bold
   text used mid-sentence. Both are in the real page and both broke this parser.
 
+## Design invariant: a failure must never look like "no change" (2026-09-09)
+
+A health check found THREE sites monitoring nothing. Two raised errors and were
+found the moment per-site failure tracking was added. The third raised nothing
+at all and had been dark for 82 days.
+
+| Site | Dark for | Cause |
+|---|---|---|
+| Flow Gardens | 28 days | shop split its one `smalls` handle into per-type products 2026-08-12; pinned handle 404ed |
+| Beleafer | 17 hours | Cloudflare began fingerprint-blocking every request, robots.txt included |
+| High Alpine | **82 days** | shop moved Weebly to Shopify; listing URL 404ed and the pagination loop swallowed it |
+
+High Alpine is the one that matters. Its pagination loop treated ANY 404 as
+"no more pages", so page 1 failing returned an empty result set. That diffs to
+"no change": no exception, no failure counter, `last_polled_at` refreshing every
+minute, health green. All 241 stored products still carried
+`first_seen: 2026-06-19`, which is the only reason it was detectable at all.
+
+Rules for any adapter that fetches a listing:
+- **A 404 on page 1 is a failure. Only page >= 2 ends pagination.** Reusing one
+  sentinel for "done paginating" and "the URL is gone" is what created the
+  82-day blind spot.
+- **A listing that parses to zero products is a failure, not an empty shop.**
+  Raise, so the health counter sees it. An empty parse otherwise diffs to
+  "no change" forever.
+- **Never swallow an exception into an empty return value.** The per-site
+  failure counter only sees what raises; anything caught internally is
+  invisible to every alerting path.
+- **Do not pin a single product handle.** Watch the catalog and filter. A shop
+  can restructure at any time, and the thing being waited for may not exist
+  yet - there was no Type 2 Smallz product on the day this was rewritten.
+- A WAF 403 is about the TLS/HTTP2 fingerprint, not the User-Agent. `http_get`
+  retries once with `curl_cffi` impersonation; do NOT forward our own UA on
+  that retry or the mismatch keeps the 403.
+
+Staleness is the check that found all three: compare each site's
+`last_polled_at`/`first_seen` against now. That catches any reason a site stops
+updating, including reasons that raise nothing. Worth running by hand when
+anything seems off.
+
 ## Known caveats
 
 - **GitHub Actions cron timing is not exact.** Scheduled workflows can be delayed up to ~10–15 min during peak GitHub load. Average is much closer to 5 min. For drop monitoring this trades worst-case timing slippage for 24/7 coverage that does not depend on this PC.
