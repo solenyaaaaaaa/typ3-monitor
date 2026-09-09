@@ -286,7 +286,7 @@ except Exception:  # pragma: no cover - depends on the install environment
     logging.info("curl_cffi unavailable; WAF-blocked sites cannot be retried")
 
 
-def http_get(session, url, ua, timeout, expect_json=False):
+def http_get(session, url, ua, timeout, expect_json=False, expect_pattern=None):
     headers = {
         "User-Agent": ua,
         "Accept": "application/json" if expect_json else
@@ -327,6 +327,24 @@ def http_get(session, url, ua, timeout, expect_json=False):
             raise requests.HTTPError(
                 "%s Error for url: %s" % (resp.status_code, url), response=resp)
     resp.encoding = "utf-8"
+    if (expect_pattern is not None and _impersonating_get is not None
+            and not expect_pattern.search(resp.text)):
+        # HTTP 200 with the expected payload missing. A WAF can return a
+        # challenge or a stripped page under a 200, so no status-code check
+        # catches this -- it surfaces later as a confusing parse error. Seen
+        # 2026-09-09: thehempbarn.com served the full page to a residential IP
+        # and a contentless 200 to the GitHub runner, which read as "variations
+        # JSON not found on page". Retry once with a browser fingerprint.
+        logging.info("expected content missing from %s; retrying impersonated", url)
+        try:
+            alt = _impersonating_get(
+                url, headers={k: v for k, v in headers.items() if k == "Accept"},
+                timeout=timeout, impersonate=BROWSER_IMPERSONATE)
+            if alt.status_code < 400 and expect_pattern.search(alt.text):
+                alt.encoding = "utf-8"
+                return alt
+        except Exception as exc:
+            logging.info("impersonated retry of %s failed: %s", url, exc)
     return resp
 
 
@@ -636,7 +654,12 @@ class HempBarnSite:
         return descs
 
     def fetch(self, session, ua, timeout):
-        resp = http_get(session, self.cfg["url"], ua, timeout)
+        # expect_pattern: the product page is worthless without the variations
+        # JSON, and a WAF can withhold it under a 200. Declaring what the page
+        # must contain lets http_get retry with a browser fingerprint instead
+        # of failing with a parse error that looks like a site redesign.
+        resp = http_get(session, self.cfg["url"], ua, timeout,
+                        expect_pattern=self.VARIATIONS_RE)
         html_text = resp.text
         m = self.VARIATIONS_RE.search(html_text)
         if not m:
