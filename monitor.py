@@ -1185,7 +1185,12 @@ class BeleaferIndoorSite:
         for page in range(1, self.max_pages + 1):
             page_url = self.category_url if page == 1 else f"{base}/page/{page}/"
             try:
-                resp = http_get(session, page_url, ua, timeout)
+                # expect_pattern on page 1 only: a first page with no products
+                # is always wrong, but a LATER page having none is how
+                # pagination ends. A WAF can strip the listing under a 200,
+                # which is how Beleafer regressed 2026-09-09 23:25 UTC.
+                resp = http_get(session, page_url, ua, timeout,
+                                expect_pattern=self.PRODUCT_URL_RE if page == 1 else None)
             except requests.HTTPError as e:
                 status = e.response.status_code if e.response is not None else None
                 # A 404 past page 1 means "no more pages". A 404 on page 1
@@ -1312,7 +1317,12 @@ class HighAlpineGeneticsSite:
         for page in range(1, self.max_pages + 1):
             page_url = base if page == 1 else f"{base}{sep}page={page}"
             try:
-                resp = http_get(session, page_url, ua, timeout)
+                # expect_pattern on page 1 only: a first page with no products
+                # is always wrong, but a LATER page having none is how
+                # pagination ends. A WAF can strip the listing under a 200,
+                # which is how Beleafer regressed 2026-09-09 23:25 UTC.
+                resp = http_get(session, page_url, ua, timeout,
+                                expect_pattern=self.RESULT_RE if page == 1 else None)
             except requests.HTTPError as e:
                 status = e.response.status_code if e.response is not None else None
                 # A 404 past page 1 means "no more pages". A 404 on page 1
