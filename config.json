@@ -37,42 +37,64 @@
   "hempbarn_livingsoil": {
     "enabled": true,
     "url": "https://www.thehempbarn.com/product/livingsoil/",
-    "description_keywords": ["special", "all time", "all-time", "10/10"]
+    "description_keywords": [
+      "special",
+      "all time",
+      "all-time",
+      "10/10"
+    ]
   },
   "hempbarn_organicsoil": {
     "enabled": true,
     "url": "https://www.thehempbarn.com/product/organicsoil/",
-    "description_keywords": ["special", "all time", "all-time", "10/10"]
+    "description_keywords": [
+      "special",
+      "all time",
+      "all-time",
+      "10/10"
+    ]
   },
   "caregiverpharms": {
     "enabled": true,
     "products_json_url": "https://caregiverpharms.com/products.json?limit=250",
     "collection_url": "https://caregiverpharms.com/collections/all",
-    "smalls_keywords": ["smalls", "micros"]
+    "smalls_keywords": [
+      "smalls",
+      "micros"
+    ]
   },
   "flowgardens_smalls": {
     "enabled": true,
-    "product_json_url": "https://flowgardens.com/products/smalls.json",
-    "product_url": "https://flowgardens.com/products/smalls",
-    "allowed_types": [2]
+    "products_json_url": "https://flowgardens.com/products.json?limit=250",
+    "shop_url": "https://flowgardens.com/collections/all",
+    "allowed_types": [
+      2
+    ]
   },
   "fiveleafwellness": {
     "enabled": true,
     "products_api_url": "https://fiveleafwellness.com/wp-json/wc/store/v1/products",
     "shop_url": "https://fiveleafwellness.com/shop/",
-    "target_categories": ["top-shelf"]
+    "target_categories": [
+      "top-shelf"
+    ]
   },
   "beleafer_indoor": {
     "enabled": true,
     "category_url": "https://beleafer.com/product-category/hemp-flower/indoor/",
-    "allowed_types": [2],
+    "allowed_types": [
+      2
+    ],
     "max_pages": 20,
     "min_interval_minutes": 5
   },
   "highalpinegenetics": {
     "enabled": true,
     "search_url": "https://www.highalpinegenetics.com/apps/search?q=+",
-    "allowed_types": [1, 2],
+    "allowed_types": [
+      1,
+      2
+    ],
     "max_pages": 30,
     "min_interval_minutes": 5
   },

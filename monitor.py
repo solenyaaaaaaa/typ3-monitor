@@ -274,6 +274,18 @@ def load_secrets():
 
 # ---------- HTTP --------------------------------------------------------
 
+# Browser-fingerprint fallback for WAF 403s (see http_get). Optional on
+# purpose: if the wheel is unavailable the monitor still runs, it just loses
+# the ability to get past a fingerprint block.
+BROWSER_IMPERSONATE = "chrome124"
+try:
+    from curl_cffi import requests as _curl_cffi_requests
+    _impersonating_get = _curl_cffi_requests.get
+except Exception:  # pragma: no cover - depends on the install environment
+    _impersonating_get = None
+    logging.info("curl_cffi unavailable; WAF-blocked sites cannot be retried")
+
+
 def http_get(session, url, ua, timeout, expect_json=False):
     headers = {
         "User-Agent": ua,
@@ -281,8 +293,39 @@ def http_get(session, url, ua, timeout, expect_json=False):
                   "text/html,application/xhtml+xml,application/xml;q=0.9",
         "Accept-Language": "en-US,en;q=0.9",
     }
-    resp = session.get(url, headers=headers, timeout=timeout)
-    resp.raise_for_status()
+    try:
+        resp = session.get(url, headers=headers, timeout=timeout)
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if status not in (403, 429) or _impersonating_get is None:
+            raise
+        # A WAF (Cloudflare here) fingerprints the TLS/HTTP2 handshake, not the
+        # User-Agent string, so `requests` is rejected no matter what headers it
+        # sends. Beleafer switched this on around 2026-09-09 06:00 UTC and
+        # started 403ing EVERY request including robots.txt, which silently took
+        # that site offline. Retrying with a real browser fingerprint restores
+        # 200. Kept generic rather than Beleafer-specific: any monitored shop
+        # can turn this on overnight, and the fallback costs nothing until a
+        # 403/429 actually happens.
+        logging.info("HTTP %s from %s; retrying with a browser fingerprint",
+                     status, url)
+        # Send ONLY Accept and let curl_cffi supply the rest. Passing our own
+        # User-Agent here overrides the impersonated one, and the WAF checks
+        # that the UA agrees with the TLS fingerprint and header order, so a
+        # mismatched pair is rejected exactly like plain requests was. Verified
+        # against Beleafer 2026-09-09: with our UA it stayed 403, without it 200.
+        impersonated_headers = {k: v for k, v in headers.items() if k == "Accept"}
+        resp = _impersonating_get(url, headers=impersonated_headers,
+                                  timeout=timeout,
+                                  impersonate=BROWSER_IMPERSONATE)
+        if resp.status_code >= 400:
+            # Raise requests.HTTPError, NOT curl_cffi's, so every existing
+            # `except requests.HTTPError` handler keeps working. Beleafer's
+            # pagination loop relies on catching a 404 to detect the last page;
+            # a curl_cffi exception escapes it and kills the whole fetch.
+            raise requests.HTTPError(
+                "%s Error for url: %s" % (resp.status_code, url), response=resp)
     resp.encoding = "utf-8"
     return resp
 
@@ -809,68 +852,127 @@ class CaregiverPharmsSite:
 
 
 class FlowGardensSmallsSite:
+    """Flow Gardens smalls, watched across the whole catalog.
+
+    Until 2026-08-12 the shop sold ONE product, handle `smalls`, whose Strain
+    dropdown carried the type inside each strain name, so this adapter watched
+    that single handle's options. At 2026-08-12 13:49 EDT the shop split it
+    into one product per type -- "Type 1 (THCa) Smallz", "Type 3 (CBD)
+    Smallz", "Type 4 (CBG) Smallz" -- and deleted the old handle. The last
+    successful poll was 13:40 EDT that day; every poll after it 404ed, and the
+    site went unmonitored for 28 days.
+
+    Two things changed. The type now lives in the PRODUCT title rather than
+    the strain name, and a watched type may have no product at all (there was
+    no Type 2 Smallz on 2026-09-09). So watching one hard-coded handle cannot
+    work: the thing being waited for is a product that does not exist yet.
+    Scan the catalog instead, and alert both when a smalls product of a
+    watched type is listed and when a new strain is added to one.
+    """
     name = "flowgardens_smalls"
     label = "Flow Gardens — Smalls"
 
-    # Strain naming convention is "<Strain Name> - Type N (...)".
-    # \b prevents Type 2 from matching "Type 20" if the merchant ever uses double digits.
-    TYPE_RE = re.compile(r"\btype\s*(\d+)\b", re.IGNORECASE)
+    # \b prevents Type 2 matching "Type 20" if the merchant ever uses two digits.
+    TYPE_RE = re.compile(r"\btype\s*[-_ ]?(\d+)\b", re.IGNORECASE)
+    # "smalls"/"smallz" only. Must NOT match the separate "Small Batch" line or
+    # "Assorted Small Buds", which are different products entirely.
+    SMALLS_RE = re.compile(r"small[sz]\b", re.IGNORECASE)
 
     def __init__(self, cfg):
         self.cfg = cfg
         at = cfg.get("allowed_types")
         self.allowed_types = set(int(x) for x in at) if at else None
+        self.products_json_url = cfg.get(
+            "products_json_url", "https://flowgardens.com/products.json?limit=250")
+        self.shop_url = cfg.get("shop_url", "https://flowgardens.com/collections/all")
 
     @classmethod
-    def _strain_type(cls, strain):
-        m = cls.TYPE_RE.search(strain)
-        return int(m.group(1)) if m else None
+    def _product_type(cls, *texts):
+        for text in texts:
+            m = cls.TYPE_RE.search(text or "")
+            if m:
+                return int(m.group(1))
+        return None
+
+    @classmethod
+    def _is_smalls(cls, handle, title):
+        return bool(cls.SMALLS_RE.search(handle or "") or cls.SMALLS_RE.search(title or ""))
 
     def fetch(self, session, ua, timeout):
-        resp = http_get(session, self.cfg["product_json_url"], ua, timeout, expect_json=True)
-        data = resp.json()
-        product = data.get("product") or {}
-        strains = set()
-        for v in product.get("variants", []) or []:
-            opt1 = v.get("option1")
-            if opt1:
-                strains.add(opt1.strip())
-        for opt in product.get("options", []) or []:
-            if opt.get("name", "").lower() == "strain":
-                for value in opt.get("values", []) or []:
-                    strains.add(value.strip())
-        return {"strains": sorted(strains)}
+        resp = http_get(session, self.products_json_url, ua, timeout, expect_json=True)
+        out = {}
+        for p in resp.json().get("products", []) or []:
+            handle = p.get("handle")
+            title = p.get("title", "") or ""
+            if not handle or not self._is_smalls(handle, title):
+                continue
+            strains = set()
+            for v in p.get("variants", []) or []:
+                opt1 = v.get("option1")
+                if opt1:
+                    strains.add(opt1.strip())
+            for opt in p.get("options", []) or []:
+                if (opt.get("name") or "").lower() == "strain":
+                    for value in opt.get("values", []) or []:
+                        strains.add(value.strip())
+            out[handle] = {
+                "title": title,
+                "type": self._product_type(title, handle),
+                "strains": sorted(strains),
+            }
+        return {"products": out}
+
+    def _watched(self, product):
+        return (self.allowed_types is None
+                or product.get("type") in self.allowed_types)
 
     def diff(self, prev_state, current):
         now_iso = datetime.now(timezone.utc).isoformat()
-        prev_strains = set(prev_state.get("strains", []))
-        curr_strains = set(current.get("strains", []))
-        is_first_run = not prev_strains
-        new_ones = sorted(curr_strains - prev_strains)
+        prev = prev_state.get("products")
+        # `products` absent means state predates the catalog-wide rewrite (it
+        # held a flat `strains` list for the old single handle). Seed silently:
+        # every smalls product on the site would otherwise alert at once.
+        migrating = prev is None
+        prev = prev or {}
+        curr = current.get("products", {})
         alerts = []
-        for s in new_ones:
-            t = self._strain_type(s)
-            if self.allowed_types is not None and t not in self.allowed_types:
-                if not is_first_run:
-                    logging.info(
-                        "[%s] new strain '%s' suppressed: type=%s not in %s",
-                        self.name, s, t, sorted(self.allowed_types),
-                    )
-                continue
-            details = f"Type {t}" if t is not None else "added to strain dropdown"
-            alerts.append({
-                "site": self.name, "label": self.label,
-                "kind": "NEW_STRAIN", "title": s,
-                "url": self.cfg["product_url"],
-                "details": details,
-            })
-        # Preserve all previously-seen strains so that one falling off the
-        # dropdown does not re-alert later when it returns.
-        new_state = {
-            "strains": sorted(prev_strains | curr_strains),
-            "last_seen": now_iso,
-        }
-        return new_state, alerts
+
+        if not migrating:
+            for handle, p in sorted(curr.items()):
+                if not self._watched(p):
+                    logging.info("[%s] %s suppressed: type=%s not in %s",
+                                 self.name, handle, p.get("type"),
+                                 sorted(self.allowed_types or []))
+                    continue
+                url = "https://flowgardens.com/products/" + handle
+                was = prev.get(handle)
+                if was is None:
+                    alerts.append({
+                        "site": self.name, "label": self.label,
+                        "kind": "NEW_PRODUCT", "title": p["title"],
+                        "url": url,
+                        "details": "Type %s smalls product listed (%d strain(s))"
+                                   % (p.get("type"), len(p["strains"])),
+                    })
+                    continue
+                new_strains = [s for s in p["strains"]
+                               if s not in set(was.get("strains", []))]
+                if new_strains:
+                    alerts.append({
+                        "site": self.name, "label": self.label,
+                        "kind": "NEW_STRAIN", "title": p["title"],
+                        "url": url,
+                        "details": "new strain(s): " + ", ".join(sorted(new_strains)),
+                    })
+
+        # Preserve products and their strains so one dropping off the catalog
+        # does not re-alert on its return.
+        merged = {h: dict(v) for h, v in prev.items()}
+        for handle, p in curr.items():
+            keep = merged.get(handle, {})
+            strains = sorted(set(keep.get("strains", [])) | set(p["strains"]))
+            merged[handle] = {"title": p["title"], "type": p["type"], "strains": strains}
+        return {"products": merged, "last_seen": now_iso}, alerts
 
 
 class FiveLeafWellnessSite:
@@ -1062,7 +1164,16 @@ class BeleaferIndoorSite:
             try:
                 resp = http_get(session, page_url, ua, timeout)
             except requests.HTTPError as e:
-                if e.response is not None and e.response.status_code == 404:
+                status = e.response.status_code if e.response is not None else None
+                # A 404 past page 1 means "no more pages". A 404 on page 1
+                # means the listing URL itself is gone, which is a FAILURE and
+                # must be raised so the health counter sees it. Breaking here
+                # instead returned an empty result set that looked like a clean
+                # poll: High Alpine's Weebly search URL started 404ing after
+                # the shop moved to Shopify, and the site sat silently
+                # unmonitored from 2026-06-19 to 2026-09-09 -- 82 days, no
+                # exception, no alert, last_polled_at refreshing every minute.
+                if status == 404 and page > 1:
                     break
                 raise
             page_urls = set(self.PRODUCT_URL_RE.findall(resp.text))
@@ -1071,6 +1182,14 @@ class BeleaferIndoorSite:
                 break
             urls |= new
             time.sleep(0.4)
+        if not urls:
+            # A storefront category that parses to zero products is never
+            # legitimate here; it means the markup or the URL changed. Raising
+            # routes it to the health counter instead of silently reporting an
+            # empty catalog, which diffs to "no change" forever.
+            raise RuntimeError(
+                "no products parsed from %s; listing markup or URL may have changed"
+                % self.category_url)
         return {"product_urls": sorted(urls)}
 
     def _evaluate(self, url):
@@ -1172,7 +1291,16 @@ class HighAlpineGeneticsSite:
             try:
                 resp = http_get(session, page_url, ua, timeout)
             except requests.HTTPError as e:
-                if e.response is not None and e.response.status_code == 404:
+                status = e.response.status_code if e.response is not None else None
+                # A 404 past page 1 means "no more pages". A 404 on page 1
+                # means the listing URL itself is gone, which is a FAILURE and
+                # must be raised so the health counter sees it. Breaking here
+                # instead returned an empty result set that looked like a clean
+                # poll: High Alpine's Weebly search URL started 404ing after
+                # the shop moved to Shopify, and the site sat silently
+                # unmonitored from 2026-06-19 to 2026-09-09 -- 82 days, no
+                # exception, no alert, last_polled_at refreshing every minute.
+                if status == 404 and page > 1:
                     break
                 raise
             page_results = self._parse_results(resp.text)
@@ -1183,6 +1311,13 @@ class HighAlpineGeneticsSite:
                 break
             results.update(fresh)
             time.sleep(0.4)
+        if not results:
+            # See BeleaferIndoorSite.fetch: an empty parse is a failure, not an
+            # empty shop. This is the exact condition that hid High Alpine's
+            # platform migration for 82 days.
+            raise RuntimeError(
+                "no products parsed from %s; listing markup or URL may have changed"
+                % self.search_url)
         return {"results": results}
 
     @classmethod
@@ -1670,12 +1805,23 @@ def main():
     )
     unhealthy = bool(persistent_failures) or not email_ok
     state.setdefault("health", {})["unhealthy"] = unhealthy
+    health_body = None
     if persistent_failures:
         diagnostics = ", ".join(
             f"{name} ({entry['count']} consecutive: {entry['last_error']})"
             for name, entry in persistent_failures.items()
         )
         summary_lines.append(f"HEALTH UNHEALTHY: {diagnostics}")
+        health_body = "\n".join(
+            ["%d site(s) failing:" % len(persistent_failures)]
+            + ["  %s - %d consecutive failures since %s\n    %s"
+               % (name, entry.get("count", 0),
+                  (entry.get("last_failed_at") or "")[:19], entry.get("last_error", ""))
+               for name, entry in sorted(persistent_failures.items())]
+        )
+    if not email_ok:
+        health_body = ((health_body + "\n") if health_body else "") + \
+            "alert email delivery FAILED after retries"
 
     save_state(state)
     logging.info("=== run end: %d total alert(s); %s ===",
@@ -1683,11 +1829,11 @@ def main():
     # Healthchecks owns down/up notification deduplication. Repeating /fail
     # while a site remains unhealthy also avoids a lost first signal masking a
     # persistent error. Healthy completions retain the dead-man's-switch ping.
-    health_ok = ping_healthcheck(success=not unhealthy)
+    health_ok = ping_healthcheck(success=not unhealthy, body=health_body)
     return 0 if not unhealthy and health_ok is not False else 1
 
 
-def ping_healthcheck(success=True):
+def ping_healthcheck(success=True, body=None):
     # Strip whitespace and any stray BOM that can sneak in via secret managers.
     url = os.environ.get("HEALTHCHECK_URL", "").strip().lstrip("﻿").strip()
     if not url:
@@ -1701,7 +1847,16 @@ def ping_healthcheck(success=True):
     # pings the base URL and clears it.
     target = url if success else url.rstrip("/") + "/fail"
     try:
-        response = requests.get(target, timeout=10)
+        if body:
+            # Healthchecks stores the ping body and shows it on the check and in
+            # its notifications. Without this the DOWN email says only that the
+            # check is down, so a broken SITE and a dead RUNNER look identical
+            # and neither names what failed. Capped well under the 100KB limit.
+            response = requests.post(
+                target, data=body[:8000].encode("utf-8"),
+                headers={"Content-Type": "text/plain; charset=utf-8"}, timeout=10)
+        else:
+            response = requests.get(target, timeout=10)
         response.raise_for_status()
         return True
     except Exception as exc:
