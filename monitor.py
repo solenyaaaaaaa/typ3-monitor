@@ -811,66 +811,88 @@ class CaregiverPharmsSite:
             }
         return out
 
+    @staticmethod
+    def _norm_variant(title):
+        """Normalise a variant title for never-seen-before comparison.
+
+        The shop writes the same size inconsistently -- both "1 oz (28g)
+        Smalls and Micros" and "1 Oz. (28g) Smalls and Micros" are on record.
+        Without normalising, a casing or punctuation edit would read as a
+        brand-new size and false-alert. Abbreviation periods are dropped but a
+        decimal point is kept, so "1/8 Oz. (3.5 Grams)" does not become
+        "(35 grams)".
+        """
+        t = (title or "").strip().lower()
+        t = re.sub(r"(?<!\d)\.(?!\d)", "", t)
+        return re.sub(r"\s+", " ", t).strip()
+
     def diff(self, prev_state, current):
+        """Two alerts only, per the 2026-09-10 narrowing:
+
+          SMALLS_BACK  - an ounce of smalls becomes available on any product
+          NEW_VARIANT  - a size option appears that this shop has NEVER
+                         offered on any product
+
+        Everything else is deliberately silent. Ordinary restocks of existing
+        sizes are noise, and a new STRAIN is explicitly not wanted: only a
+        size that never existed before counts as new here.
+        """
         now_iso = datetime.now(timezone.utc).isoformat()
         prev = prev_state.get("products", {})
         alerts = []
         product_url_base = "https://caregiverpharms.com/products/"
-        for handle, p in current.items():
-            url = product_url_base + handle
-            is_new = handle not in prev
-            if is_new:
-                kind = "NEW_PRODUCT"
-                detail = "in stock" if p["any_available"] else "sold out"
-                if p["smalls_available"]:
-                    detail += " — smalls/micros AVAILABLE"
+
+        known = set(prev_state.get("known_variant_titles", []))
+        seeding_vocabulary = "known_variant_titles" not in prev_state
+        if seeding_vocabulary:
+            # First run under this rule. Seed the vocabulary from every variant
+            # ever recorded (state preserves products that leave the catalog),
+            # so the switchover does not alert on the entire existing size list.
+            for was in prev.values():
+                for vtitle in (was.get("variants") or {}):
+                    known.add(self._norm_variant(vtitle))
+
+        first_sighting = {}
+        for handle, p in sorted(current.items()):
+            for vtitle in p.get("variants", {}):
+                norm = self._norm_variant(vtitle)
+                if norm not in known and norm not in first_sighting:
+                    first_sighting[norm] = (vtitle, p["title"], handle)
+
+        if not seeding_vocabulary:
+            for norm, (vtitle, ptitle, handle) in sorted(first_sighting.items()):
                 alerts.append({
                     "site": self.name, "label": self.label,
-                    "kind": kind, "title": p["title"],
-                    "url": url, "details": detail,
+                    "kind": "NEW_VARIANT", "title": vtitle,
+                    "url": product_url_base + handle,
+                    "details": "size never offered before; first seen on %s" % ptitle,
                 })
+        known |= set(first_sighting)
+
+        for handle, p in sorted(current.items()):
+            was = prev.get(handle)
+            if was is None:
+                # A brand-new strain is NOT an alert under these rules. Record
+                # it so its smalls transitions are tracked from here on.
                 continue
-            was = prev[handle]
-            prev_variants = was.get("variants")
-            if prev_variants is None:
-                # Product predates per-variant tracking. Seed its variant map
-                # this run without alerting, otherwise the switchover fires an
-                # alert for every currently-available size on every product.
-                # The legacy product-level smalls check still runs so a smalls
-                # restock is not missed on the single seeding run.
-                if p["smalls_available"] and not was.get("smalls_available", False):
-                    alerts.append({
-                        "site": self.name, "label": self.label,
-                        "kind": "SMALLS_BACK", "title": p["title"],
-                        "url": url,
-                        "details": "smalls/micros variant available",
-                    })
-                continue
-            newly_available = [
-                vtitle for vtitle, avail in p["variants"].items()
-                if avail and not prev_variants.get(vtitle, False)
-            ]
-            if not newly_available:
-                continue
-            # Exactly one alert per product per run, however many variants came
-            # back. Several variants of one product returning is one event, not
-            # several. Smalls keeps its own highlighted kind when it is part of
-            # the batch, so that signal is not lost to the merge.
-            kind = ("SMALLS_BACK"
-                    if any(self._is_smalls_variant(v) for v in newly_available)
-                    else "RESTOCK")
-            alerts.append({
-                "site": self.name, "label": self.label,
-                "kind": kind, "title": p["title"],
-                "url": url,
-                "details": "back in stock: " + ", ".join(newly_available),
-            })
+            if p["smalls_available"] and not was.get("smalls_available", False):
+                alerts.append({
+                    "site": self.name, "label": self.label,
+                    "kind": "SMALLS_BACK", "title": p["title"],
+                    "url": product_url_base + handle,
+                    "details": "ounce of smalls/micros available",
+                })
+
         # Preserve previously-seen handles to prevent re-alerts when a
         # product temporarily disappears from the collection JSON.
         merged_products = dict(prev)
         for handle, p in current.items():
             merged_products[handle] = dict(p)
-        new_state = {"products": merged_products, "last_seen": now_iso}
+        new_state = {
+            "products": merged_products,
+            "known_variant_titles": sorted(known),
+            "last_seen": now_iso,
+        }
         return new_state, alerts
 
 
@@ -1556,6 +1578,9 @@ def _row(a):
         "NEW_PRODUCT": "#c0392b",
         "NEW_STRAIN": "#c0392b",
         "SMALLS_BACK": "#2980b9",
+        # A size this shop has never offered before. Rare by design, so give
+        # it its own colour rather than letting it read as a routine restock.
+        "NEW_VARIANT": "#8e44ad",
     }.get(a["kind"], "#333")
     return (
         '<tr>'
