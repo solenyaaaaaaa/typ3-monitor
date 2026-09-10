@@ -219,6 +219,26 @@ Staleness is the check that found all three: compare each site's
 updating, including reasons that raise nothing. Worth running by hand when
 anything seems off.
 
+## Design invariant: bound every external call inside the long-lived loop (2026-09-10)
+
+The loop runs 5h30m. Anything inside it that can block forever takes the whole
+loop with it, and the job keeps reporting `in_progress` and healthy the entire
+time. Run 157443 wedged on ONE iteration for 17 minutes and committed nothing;
+an identical run takes ~21s locally, so nothing was merely slow. Cadence went
+from a clean 60s to zero with no error anywhere.
+
+- `python monitor.py` runs under `timeout --kill-after=15s 150`.
+- `git push` / `git fetch` in `push_state` run under `timeout 90`.
+- Timeouts are counted separately from ordinary non-zero exits and reported in
+  the end-of-loop summary, so "wedged" and "failed" stay distinguishable.
+
+**Do not force a code changeover by dispatching a run and cancelling the live
+one.** That race is the likely source of this repo's permanently stuck runs
+(84294, 90164, 143238, 143301 are all still queued/in_progress from earlier
+months). If a changeover is genuinely urgent: cancel first, WAIT for the run to
+reach a terminal state, then dispatch. Otherwise just let the handoff carry the
+new code at the next loop boundary.
+
 ## Known caveats
 
 - **GitHub Actions cron timing is not exact.** Scheduled workflows can be delayed up to ~10–15 min during peak GitHub load. Average is much closer to 5 min. For drop monitoring this trades worst-case timing slippage for 24/7 coverage that does not depend on this PC.
