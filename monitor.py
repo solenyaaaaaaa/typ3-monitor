@@ -224,10 +224,15 @@ def record_site_failure(state, site_name, exc, threshold):
     failures = state.setdefault("health", {}).setdefault("site_failures", {})
     previous = failures.get(site_name, {})
     count = min(int(previous.get("count", 0)) + 1, threshold)
+    now_iso = datetime.now(timezone.utc).isoformat()
     failures[site_name] = {
         "count": count,
+        # Preserved across the streak: `count` is capped at the threshold, so
+        # it cannot distinguish "failing for 3 minutes" from "failing for 3
+        # days". Duration is what decides whether a human should care.
+        "first_failed_at": previous.get("first_failed_at") or now_iso,
         "last_error": str(exc)[:300],
-        "last_failed_at": datetime.now(timezone.utc).isoformat(),
+        "last_failed_at": now_iso,
     }
     return count
 
@@ -245,6 +250,31 @@ def persistent_site_failures(state, threshold, active_site_names):
         name: entry for name, entry in failures.items()
         if int(entry.get("count", 0)) >= threshold
     }
+
+
+def degraded_site_failures(persistent_failures, degraded_after_minutes):
+    """Of the sites currently failing, which have been failing long enough to
+    be worth a human's attention?
+
+    Beleafer's Cloudflare block comes and goes within minutes. Treating three
+    consecutive failures as an incident meant a transient block and a genuinely
+    dead site looked identical. Duration separates them.
+    """
+    if degraded_after_minutes <= 0:
+        return dict(persistent_failures)
+    now = datetime.now(timezone.utc)
+    out = {}
+    for name, entry in persistent_failures.items():
+        started = entry.get("first_failed_at")
+        if not started:
+            continue
+        try:
+            began = datetime.fromisoformat(started)
+        except ValueError:
+            continue
+        if (now - began).total_seconds() / 60.0 >= degraded_after_minutes:
+            out[name] = entry
+    return out
 
 
 def load_secrets():
@@ -1792,6 +1822,7 @@ def main():
     all_alerts = []
     summary_lines = []
     failure_threshold = max(1, int(cfg.get("site_failure_threshold", 3)))
+    degraded_after_minutes = float(cfg.get("site_degraded_after_minutes", 120))
 
     now_utc = datetime.now(timezone.utc)
     for site in sites:
@@ -1861,33 +1892,45 @@ def main():
     persistent_failures = persistent_site_failures(
         state, failure_threshold, {site.name for site in sites}
     )
-    unhealthy = bool(persistent_failures) or not email_ok
-    state.setdefault("health", {})["unhealthy"] = unhealthy
-    health_body = None
+    degraded = degraded_site_failures(persistent_failures, degraded_after_minutes)
+
+    # The Healthchecks check answers exactly ONE question: is the monitor
+    # running and able to tell me about a drop? A single flaky STORE is not
+    # that question. Letting any failing site flip this produced a DOWN/UP
+    # pair every time Beleafer's Cloudflare block came and went -- 4+ pairs a
+    # day of pure noise, which trains you to ignore the one email that
+    # matters. Site trouble is recorded in state for the triage task to pick
+    # up; only undelivered alerts (or no ping at all, which is the
+    # dead-man's-switch doing its real job) put the check down.
+    unhealthy = not email_ok
+    health = state.setdefault("health", {})
+    health["unhealthy"] = unhealthy
+    health["degraded_sites"] = sorted(degraded)
+    health["checked_at"] = datetime.now(timezone.utc).isoformat()
+
     if persistent_failures:
-        diagnostics = ", ".join(
+        summary_lines.append("SITES FAILING: " + ", ".join(
             f"{name} ({entry['count']} consecutive: {entry['last_error']})"
-            for name, entry in persistent_failures.items()
-        )
-        summary_lines.append(f"HEALTH UNHEALTHY: {diagnostics}")
-        health_body = "\n".join(
-            ["%d site(s) failing:" % len(persistent_failures)]
-            + ["  %s - %d consecutive failures since %s\n    %s"
-               % (name, entry.get("count", 0),
-                  (entry.get("last_failed_at") or "")[:19], entry.get("last_error", ""))
-               for name, entry in sorted(persistent_failures.items())]
-        )
-    if not email_ok:
-        health_body = ((health_body + "\n") if health_body else "") + \
-            "alert email delivery FAILED after retries"
+            for name, entry in sorted(persistent_failures.items())))
+    if degraded:
+        summary_lines.append("DEGRADED (>%dm): %s"
+                             % (degraded_after_minutes, ", ".join(sorted(degraded))))
+
+    health_body = None
+    if unhealthy:
+        parts = ["alert email delivery FAILED after retries"]
+        if persistent_failures:
+            parts.append("also failing: " + ", ".join(sorted(persistent_failures)))
+        health_body = "\n".join(parts)
 
     save_state(state)
     logging.info("=== run end: %d total alert(s); %s ===",
                  len(all_alerts), "; ".join(summary_lines))
-    # Healthchecks owns down/up notification deduplication. Repeating /fail
-    # while a site remains unhealthy also avoids a lost first signal masking a
-    # persistent error. Healthy completions retain the dead-man's-switch ping.
     health_ok = ping_healthcheck(success=not unhealthy, body=health_body)
+    # Exit non-zero ONLY for undelivered alerts. A failing site must not fail
+    # the job: the loop reads this exit code, and a wedged store would
+    # otherwise mark every 5h30m run as failed and generate GitHub failure
+    # mail on top of everything else.
     return 0 if not unhealthy and health_ok is not False else 1
 
 
