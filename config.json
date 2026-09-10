@@ -89,14 +89,15 @@
     "min_interval_minutes": 5
   },
   "highalpinegenetics": {
-    "enabled": true,
+    "enabled": false,
     "search_url": "https://www.highalpinegenetics.com/apps/search?q=+",
     "allowed_types": [
       1,
       2
     ],
     "max_pages": 30,
-    "min_interval_minutes": 5
+    "min_interval_minutes": 5,
+    "disabled_reason": "2026-09-09: shop migrated Weebly -> Shopify and now sells seeds only; the adapter suppresses seeds, so it could never alert. Old /apps/search URL 404s. To revive: set products_json_url to https://highalpinegenetics.com/products.json and rewrite the adapter for Shopify, but only once the shop carries flower again."
   },
   "antheiafarms": {
     "enabled": true,
