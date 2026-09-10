@@ -36,11 +36,11 @@ push_state() {
     fi
   fi
   for attempt in 1 2 3 4; do
-    if git push -q 2>&1; then
+    if timeout 90 git push -q 2>&1; then
       return 0
     fi
     echo "push attempt $attempt failed; rebasing and retrying..."
-    if ! git fetch -q origin main; then
+    if ! timeout 90 git fetch -q origin main; then
       echo "fetch attempt $attempt failed"
       sleep $(( attempt * 3 ))
       continue
@@ -59,6 +59,7 @@ iteration=0
 polls_ok=0
 polls_failed=0
 commits=0
+polls_timed_out=0
 last_poll_status=0
 state_push_failed=0
 
@@ -68,12 +69,23 @@ while [ "$(date +%s)" -lt "$END" ]; do
   iteration=$(( iteration + 1 ))
   started=$(date +%s)
 
-  if python monitor.py; then
+  # Bound every poll. One hung fetch must never stall the loop: on 2026-09-10
+  # run 157443 sat 17 minutes on a single iteration and committed nothing, so
+  # the monitor was dark while the job still looked alive and healthy. Losing
+  # one iteration is always cheaper than losing the loop. A full local run is
+  # ~21s, so 150s is generous headroom, not a tight bound.
+  if timeout --kill-after=15s "${POLL_TIMEOUT:-150}" python monitor.py; then
     polls_ok=$(( polls_ok + 1 ))
     last_poll_status=0
   else
+    rc=$?
     polls_failed=$(( polls_failed + 1 ))
-    echo "::warning::monitor.py exited non-zero on iteration ${iteration}"
+    if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+      polls_timed_out=$(( polls_timed_out + 1 ))
+      echo "::warning::poll TIMED OUT after ${POLL_TIMEOUT:-150}s on iteration ${iteration}"
+    else
+      echo "::warning::monitor.py exited ${rc} on iteration ${iteration}"
+    fi
     last_poll_status=1
   fi
 
@@ -98,7 +110,7 @@ while [ "$(date +%s)" -lt "$END" ]; do
   fi
 done
 
-echo "loop finished: ${iteration} iterations, ${polls_ok} ok, ${polls_failed} failed, ${commits} state commits"
+echo "loop finished: ${iteration} iterations, ${polls_ok} ok, ${polls_failed} failed (${polls_timed_out} timed out), ${commits} state commits"
 if [ "$last_poll_status" -ne 0 ] || [ "$state_push_failed" -ne 0 ]; then
   exit 1
 fi
