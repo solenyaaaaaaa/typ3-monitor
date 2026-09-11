@@ -239,6 +239,36 @@ months). If a changeover is genuinely urgent: cancel first, WAIT for the run to
 reach a terminal state, then dispatch. Otherwise just let the handoff carry the
 new code at the next loop boundary.
 
+## Alerting policy: the check answers one question (2026-09-10)
+
+The Healthchecks check means "the monitor is running and can tell me about a
+drop". Nothing else may flip it. Previously any persistent site failure did, so
+each time Beleafer's Cloudflare block came and went the user got a DOWN mail
+and then an UP mail. Over one 26-hour window the runner never missed a beat -
+1,544 polls at ~1/min - while the check flapped purely on Beleafer. That is how
+you teach someone to ignore the one alert that matters.
+
+- `unhealthy` (the `/fail` ping) is set ONLY by undelivered alert email. Absence
+  of any ping still covers "the monitor is dead" - that is the dead-man's-switch
+  doing its actual job.
+- Site trouble is recorded in `state.health.site_failures` with
+  `first_failed_at`, and a site is marked in `state.health.degraded_sites` only
+  after `site_degraded_after_minutes` (default 120) of CONTINUOUS failure.
+  `count` is capped at the threshold and cannot distinguish 3 minutes from 3
+  days, so duration is the thing to reason about.
+- `monitor.py` exits non-zero only for undelivered email. The poll loop reads
+  that exit code, so a broken store must not fail the job.
+
+**Who notices site breakage now:** `triage.py` plus the `drop-monitor-triage`
+scheduled task (every 4h, silent when healthy) - see SYSTEM-MODS.md. Decoupling
+without that replacement would recreate the silent-failure problem that hid High
+Alpine for 82 days. Do not remove one without the other.
+
+**Beleafer is expected to flap.** Cloudflare blocks GitHub's runner IPs
+intermittently and the block is not defeated by fingerprint impersonation, which
+only helps when the block keys on the client rather than the address. It
+recovers on its own. Escalate it only after many continuous hours.
+
 ## Known caveats
 
 - **GitHub Actions cron timing is not exact.** Scheduled workflows can be delayed up to ~10–15 min during peak GitHub load. Average is much closer to 5 min. For drop monitoring this trades worst-case timing slippage for 24/7 coverage that does not depend on this PC.
