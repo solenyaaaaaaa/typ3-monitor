@@ -86,7 +86,9 @@
       2
     ],
     "max_pages": 20,
-    "min_interval_minutes": 5
+    "min_interval_minutes": 5,
+    "site_degraded_after_minutes": 720,
+    "flaky_reason": "Cloudflare intermittently blocks GitHub Actions runner IPs; not defeatable by fingerprint impersonation, which only helps when the block keys on the client rather than the address. Recovers on its own after hours. Escalate only at 12h."
   },
   "highalpinegenetics": {
     "enabled": false,

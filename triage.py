@@ -81,9 +81,16 @@ def main():
             continue
         entry = failures[name]
         since = age_min(entry.get("first_failed_at"), now)
-        if since is not None and since >= SITE_ATTENTION_MIN:
-            problems.append(("ATTENTION", "%s failing for %.1f h: %s"
-                             % (name, since / 60.0, entry.get("last_error", "")[:160])))
+        # Per-site override: a store known to flap should not be escalated on
+        # the same clock as a store that has genuinely gone away. Beleafer's
+        # Cloudflare block on GitHub's IPs comes and goes over hours and is
+        # not fixable from our side, so escalating it at 2h is crying wolf.
+        window = float(cfg.get(name, {}).get("site_degraded_after_minutes",
+                                             SITE_ATTENTION_MIN))
+        if since is not None and since >= window:
+            problems.append(("ATTENTION", "%s failing for %.1f h (window %.0fh): %s"
+                             % (name, since / 60.0, window / 60.0,
+                                entry.get("last_error", "")[:160])))
         else:
             notes.append("%s failing %s min (transient, not escalated)"
                          % (name, "%.0f" % since if since is not None else "?"))
