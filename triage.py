@@ -43,15 +43,20 @@ def age_min(iso, now):
         return None
 
 
-def main():
+def evaluate():
+    """Return (worst, problems, notes). worst is OK / ATTENTION / CRITICAL.
+
+    Split out from main() so an unattended fixer can branch on the result
+    without scraping printed text.
+    """
     if git("fetch", "origin", "--quiet").returncode != 0:
-        print("ATTENTION: cannot reach the GitHub remote; triage inconclusive")
-        return 1
+        return "ATTENTION", [("ATTENTION", "cannot reach the GitHub remote; "
+                              "triage inconclusive")], []
 
     shown = git("show", "origin/main:state.json")
     if shown.returncode != 0:
-        print("CRITICAL: cannot read state.json from origin/main")
-        return 2
+        return "CRITICAL", [("CRITICAL", "cannot read state.json from "
+                             "origin/main")], []
     state = json.loads(shown.stdout)
 
     cfg = json.load(open(REPO + r"\config.json", encoding="utf-8"))
@@ -108,10 +113,19 @@ def main():
                              "error - possible silent failure" % (name, stale / 60.0)))
 
     if not problems:
+        return "OK", [], notes
+    worst = "CRITICAL" if any(p[0] == "CRITICAL" for p in problems) else "ATTENTION"
+    return worst, problems, notes
+
+
+MONITOR_DOWN = "has not polled in"
+
+
+def main():
+    worst, problems, notes = evaluate()
+    if worst == "OK":
         print("OK: monitor healthy. " + "; ".join(notes))
         return 0
-
-    worst = "CRITICAL" if any(p[0] == "CRITICAL" for p in problems) else "ATTENTION"
     print("%s: %d issue(s)" % (worst, len(problems)))
     for level, msg in problems:
         print("  [%s] %s" % (level, msg))
