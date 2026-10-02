@@ -174,7 +174,7 @@
           "last_seen": "2026-05-31T06:38:15.385535+00:00"
         }
       },
-      "last_polled_at": "2026-10-02T04:08:17.582018+00:00"
+      "last_polled_at": "2026-10-02T04:09:17.555563+00:00"
     },
     "hempbarn_livingsoil": {
       "strains": [
@@ -251,8 +251,8 @@
         "Headband",
         "Sherb Star"
       ],
-      "last_seen": "2026-10-02T04:08:19.409551+00:00",
-      "last_polled_at": "2026-10-02T04:08:17.582018+00:00"
+      "last_seen": "2026-10-02T04:09:21.782055+00:00",
+      "last_polled_at": "2026-10-02T04:09:17.555563+00:00"
     },
     "caregiverpharms": {
       "products": {
@@ -361,8 +361,8 @@
         "1/4 oz (7 grams)",
         "1/8 oz (3.5 grams)"
       ],
-      "last_seen": "2026-10-02T04:08:19.675185+00:00",
-      "last_polled_at": "2026-10-02T04:08:17.582018+00:00"
+      "last_seen": "2026-10-02T04:09:22.023340+00:00",
+      "last_polled_at": "2026-10-02T04:09:17.555563+00:00"
     },
     "flowgardens_smalls": {
       "products": {
@@ -436,8 +436,8 @@
           ]
         }
       },
-      "last_seen": "2026-10-02T04:08:20.259571+00:00",
-      "last_polled_at": "2026-10-02T04:08:17.582018+00:00"
+      "last_seen": "2026-10-02T04:09:22.563135+00:00",
+      "last_polled_at": "2026-10-02T04:09:17.555563+00:00"
     },
     "hempbarn_organicsoil": {
       "strains": [
@@ -516,8 +516,8 @@
         "Neon",
         "Tamalez"
       ],
-      "last_seen": "2026-10-02T04:08:19.503346+00:00",
-      "last_polled_at": "2026-10-02T04:08:17.582018+00:00"
+      "last_seen": "2026-10-02T04:09:21.875280+00:00",
+      "last_polled_at": "2026-10-02T04:09:17.555563+00:00"
     },
     "fiveleafwellness": {
       "alerted": [
@@ -531,8 +531,8 @@
       "target_current": [
         "super-boof-indoor-hybrid-2"
       ],
-      "last_seen": "2026-10-02T04:08:20.308530+00:00",
-      "last_polled_at": "2026-10-02T04:08:17.582018+00:00"
+      "last_seen": "2026-10-02T04:09:22.611002+00:00",
+      "last_polled_at": "2026-10-02T04:09:17.555563+00:00"
     },
     "beleafer_indoor": {
       "v": 2,
@@ -2104,24 +2104,24 @@
           }
         }
       },
-      "last_seen": "2026-10-02T04:08:20.681174+00:00",
-      "last_polled_at": "2026-10-02T04:08:17.582018+00:00"
+      "last_seen": "2026-10-02T04:09:23.673470+00:00",
+      "last_polled_at": "2026-10-02T04:09:17.555563+00:00"
     }
   },
-  "last_run": "2026-10-02T04:08:20.681237+00:00",
+  "last_run": "2026-10-02T04:09:23.673530+00:00",
   "health": {
     "site_failures": {
       "beleafer_indoor": {
         "count": 3,
         "first_failed_at": "2026-09-14T06:50:42.061386+00:00",
         "last_error": "403 Error for url: https://beleafer.com/product-category/hemp-flower/indoor/",
-        "last_failed_at": "2026-10-02T04:08:20.521943+00:00"
+        "last_failed_at": "2026-10-02T04:09:23.499917+00:00"
       }
     },
     "unhealthy": false,
     "degraded_sites": [
       "beleafer_indoor"
     ],
-    "checked_at": "2026-10-02T04:08:20.681226+00:00"
+    "checked_at": "2026-10-02T04:09:23.673519+00:00"
   }
 }
