@@ -87,8 +87,9 @@
     ],
     "max_pages": 20,
     "min_interval_minutes": 5,
+    "impersonate": true,
     "site_degraded_after_minutes": 720,
-    "flaky_reason": "Cloudflare intermittently blocks GitHub Actions runner IPs; not defeatable by fingerprint impersonation, which only helps when the block keys on the client rather than the address. Recovers on its own after hours. Escalate only at 12h."
+    "flaky_reason": "2026-10-13: the 403s that kept this site dark from 2026-09-14 were the shop's host (SiteGround, behind Cloudflare) refusing outdated browser fingerprints: Chrome 136 and older, including the pinned chrome124 the monitor used, while Chrome 142+, Safari and Firefox got 200 from the same IP. Fixed by impersonating the newest browsers on every request (impersonate: true; BROWSER_IMPERSONATE in monitor.py). Earlier it also flapped on GitHub runner IPs, so the 12h escalation window stays until it has held clean."
   },
   "highalpinegenetics": {
     "enabled": false,

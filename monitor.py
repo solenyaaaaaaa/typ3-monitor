@@ -131,6 +131,7 @@ DEFAULT_CONFIG = {
         "allowed_types": [2],
         "max_pages": 20,
         "min_interval_minutes": 5,
+        "impersonate": True,
     },
     "highalpinegenetics": {
         "enabled": True,
@@ -315,10 +316,18 @@ def load_secrets():
 
 # ---------- HTTP --------------------------------------------------------
 
-# Browser-fingerprint fallback for WAF 403s (see http_get). Optional on
-# purpose: if the wheel is unavailable the monitor still runs, it just loses
-# the ability to get past a fingerprint block.
-BROWSER_IMPERSONATE = "chrome124"
+# Browser fingerprints to present when a WAF refuses ours (see http_get), in
+# the order tried. curl_cffi's bare aliases mean "its newest target of that
+# browser", and the workflow installs the newest curl_cffi on every run, so
+# these stay current with no edits. NEVER pin a version. On 2026-10-13
+# Beleafer's host answered 403 to every Chrome fingerprint up to 136 --
+# including the pinned "chrome124" this used to be -- and 200 to Chrome 142+,
+# Safari and Firefox from the same IP. Real Chrome auto-updates, so an old
+# Chrome fingerprint reads as a bot, and a pinned one only gets older:
+# Beleafer was dark for 29 days (2026-09-14 to 2026-10-13) on exactly that.
+# Optional on purpose: if the wheel is unavailable the monitor still runs, it
+# just loses the ability to get past a fingerprint block.
+BROWSER_IMPERSONATE = ("chrome", "safari", "firefox")
 try:
     from curl_cffi import requests as _curl_cffi_requests
     _impersonating_get = _curl_cffi_requests.get
@@ -326,14 +335,71 @@ except Exception:  # pragma: no cover - depends on the install environment
     _impersonating_get = None
     logging.info("curl_cffi unavailable; WAF-blocked sites cannot be retried")
 
+# host -> the fingerprint that last got through, so the rest of a run's
+# requests to that host (Beleafer: a listing, then product pages) lead with it.
+_IMPERSONATION_THAT_WORKED = {}
 
-def http_get(session, url, ua, timeout, expect_json=False, expect_pattern=None):
+
+def _impersonated_get(url, accept, timeout, expect_pattern=None):
+    """GET `url` with real browsers' TLS/HTTP2 fingerprints, trying each in
+    BROWSER_IMPERSONATE until one is let through. A 403/429, or a 200 missing
+    `expect_pattern`, moves on to the next fingerprint; any other status (a
+    404 that ends pagination, say) is final. Returns the first good response,
+    else the last one received, else re-raises the last error."""
+    host = url.split("/")[2] if "://" in url else url
+    order = list(BROWSER_IMPERSONATE)
+    worked = _IMPERSONATION_THAT_WORKED.get(host)
+    if worked in order:
+        order.remove(worked)
+        order.insert(0, worked)
+    last_resp = last_exc = None
+    for target in order:
+        try:
+            # Send ONLY Accept and let curl_cffi supply the rest. Passing our
+            # own User-Agent overrides the impersonated one, and the WAF checks
+            # that the UA agrees with the TLS fingerprint and header order, so
+            # a mismatched pair is rejected exactly like plain requests was.
+            # Verified against Beleafer 2026-09-09: with our UA it stayed 403,
+            # without it 200.
+            resp = _impersonating_get(url, headers={"Accept": accept},
+                                      timeout=timeout, impersonate=target)
+        except Exception as exc:
+            last_exc = exc
+            continue
+        resp.encoding = "utf-8"
+        blocked = resp.status_code in (403, 429) or (
+            resp.status_code < 400 and expect_pattern is not None
+            and not expect_pattern.search(resp.text))
+        if not blocked:
+            if resp.status_code < 400:
+                _IMPERSONATION_THAT_WORKED[host] = target
+            return resp
+        last_resp = resp
+    if last_resp is not None:
+        return last_resp
+    raise last_exc
+
+
+def http_get(session, url, ua, timeout, expect_json=False, expect_pattern=None,
+             impersonate=False):
+    """GET `url`, falling back to real browser fingerprints when a WAF
+    refuses plain `requests`. `impersonate=True` skips the plain attempt, for
+    a site that refuses it every time: each poll then stops opening with a
+    request the WAF already scores as a bot."""
+    accept = ("application/json" if expect_json else
+              "text/html,application/xhtml+xml,application/xml;q=0.9")
     headers = {
         "User-Agent": ua,
-        "Accept": "application/json" if expect_json else
-                  "text/html,application/xhtml+xml,application/xml;q=0.9",
+        "Accept": accept,
         "Accept-Language": "en-US,en;q=0.9",
     }
+    if impersonate and _impersonating_get is not None:
+        resp = _impersonated_get(url, accept, timeout, expect_pattern)
+        if resp.status_code >= 400:
+            # requests.HTTPError, not curl_cffi's: see the note below.
+            raise requests.HTTPError(
+                "%s Error for url: %s" % (resp.status_code, url), response=resp)
+        return resp
     try:
         resp = session.get(url, headers=headers, timeout=timeout)
         resp.raise_for_status()
@@ -341,25 +407,17 @@ def http_get(session, url, ua, timeout, expect_json=False, expect_pattern=None):
         status = getattr(getattr(exc, "response", None), "status_code", None)
         if status not in (403, 429) or _impersonating_get is None:
             raise
-        # A WAF (Cloudflare here) fingerprints the TLS/HTTP2 handshake, not the
-        # User-Agent string, so `requests` is rejected no matter what headers it
-        # sends. Beleafer switched this on around 2026-09-09 06:00 UTC and
-        # started 403ing EVERY request including robots.txt, which silently took
-        # that site offline. Retrying with a real browser fingerprint restores
-        # 200. Kept generic rather than Beleafer-specific: any monitored shop
-        # can turn this on overnight, and the fallback costs nothing until a
+        # A WAF fingerprints the TLS/HTTP2 handshake, not the User-Agent
+        # string, so `requests` is rejected no matter what headers it sends.
+        # Beleafer switched this on around 2026-09-09 06:00 UTC and started
+        # 403ing EVERY request including robots.txt, which silently took that
+        # site offline. Retrying with a real browser fingerprint restores 200.
+        # Kept generic rather than Beleafer-specific: any monitored shop can
+        # turn this on overnight, and the fallback costs nothing until a
         # 403/429 actually happens.
         logging.info("HTTP %s from %s; retrying with a browser fingerprint",
                      status, url)
-        # Send ONLY Accept and let curl_cffi supply the rest. Passing our own
-        # User-Agent here overrides the impersonated one, and the WAF checks
-        # that the UA agrees with the TLS fingerprint and header order, so a
-        # mismatched pair is rejected exactly like plain requests was. Verified
-        # against Beleafer 2026-09-09: with our UA it stayed 403, without it 200.
-        impersonated_headers = {k: v for k, v in headers.items() if k == "Accept"}
-        resp = _impersonating_get(url, headers=impersonated_headers,
-                                  timeout=timeout,
-                                  impersonate=BROWSER_IMPERSONATE)
+        resp = _impersonated_get(url, accept, timeout)
         if resp.status_code >= 400:
             # Raise requests.HTTPError, NOT curl_cffi's, so every existing
             # `except requests.HTTPError` handler keeps working. Beleafer's
@@ -375,14 +433,11 @@ def http_get(session, url, ua, timeout, expect_json=False, expect_pattern=None):
         # catches this -- it surfaces later as a confusing parse error. Seen
         # 2026-09-09: thehempbarn.com served the full page to a residential IP
         # and a contentless 200 to the GitHub runner, which read as "variations
-        # JSON not found on page". Retry once with a browser fingerprint.
+        # JSON not found on page". Retry with browser fingerprints.
         logging.info("expected content missing from %s; retrying impersonated", url)
         try:
-            alt = _impersonating_get(
-                url, headers={k: v for k, v in headers.items() if k == "Accept"},
-                timeout=timeout, impersonate=BROWSER_IMPERSONATE)
+            alt = _impersonated_get(url, accept, timeout, expect_pattern)
             if alt.status_code < 400 and expect_pattern.search(alt.text):
-                alt.encoding = "utf-8"
                 return alt
         except Exception as exc:
             logging.info("impersonated retry of %s failed: %s", url, exc)
@@ -1208,6 +1263,9 @@ class BeleaferIndoorSite:
         at = cfg.get("allowed_types")
         self.allowed_types = set(int(x) for x in at) if at else None
         self.max_pages = cfg.get("max_pages", 20)
+        # The shop's host refuses plain `requests` every time, so open with a
+        # browser fingerprint instead of a request it already scores as a bot.
+        self.impersonate = bool(cfg.get("impersonate", False))
         self._session = None
         self._ua = None
         self._timeout = None
@@ -1218,7 +1276,8 @@ class BeleaferIndoorSite:
 
     def _fetch_product_page(self, url):
         try:
-            resp = http_get(self._session, url, self._ua, self._timeout)
+            resp = http_get(self._session, url, self._ua, self._timeout,
+                            impersonate=self.impersonate)
             return resp.text
         except Exception as exc:
             logging.warning("[%s] failed to fetch %s: %s", self.name, url, exc)
@@ -1253,7 +1312,8 @@ class BeleaferIndoorSite:
                 # pagination ends. A WAF can strip the listing under a 200,
                 # which is how Beleafer regressed 2026-09-09 23:25 UTC.
                 resp = http_get(session, page_url, ua, timeout,
-                                expect_pattern=self.PRODUCT_URL_RE if page == 1 else None)
+                                expect_pattern=self.PRODUCT_URL_RE if page == 1 else None,
+                                impersonate=self.impersonate)
             except requests.HTTPError as e:
                 status = e.response.status_code if e.response is not None else None
                 # A 404 past page 1 means "no more pages". A 404 on page 1
@@ -1611,8 +1671,9 @@ class VeritasSite:
 
     Never read the cart minimum as the MOQ. Most rosin listings accept a
     quantity of 1 (`add_to_cart.minimum` 1, the WooCommerce default) while the
-    menu prices the same product "$27.00 per gram | 10g MOQ". Reading 1 as
-    "sold by the gram" would have alerted on 33 listings on day one. A
+    menu prices the same product "$27.00 per gram | 10g MOQ", and checkout
+    refuses anything under that MOQ (confirmed first-hand 2026-10-13). Reading
+    1 as "sold by the gram" would have alerted on 33 listings on day one. A
     minimum of 1 is no evidence either way; only a stated size or MOQ is.
 
     Every rule is re-evaluated from fresh data on every run, so a size option

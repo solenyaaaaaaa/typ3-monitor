@@ -24,7 +24,7 @@ Nothing outside GitHub needs managing. To pause polling, disable the workflow; t
   4. **Caregiver Pharms** (`caregiverpharms.com/collections/all`) — **narrowed 2026-09-10 to two alerts only**: `SMALLS_BACK` when an ounce of smalls/micros becomes available on any product, and `NEW_VARIANT` when a size option appears that the shop has NEVER offered on any product. Ordinary restocks of existing sizes are silent, and a brand-new STRAIN is silent too — only a never-before-seen SIZE counts as new here. The known-size vocabulary lives in `state.sites.caregiverpharms.known_variant_titles` and is normalised (lowercased, abbreviation periods dropped, decimals kept) because the shop writes the same size both "1 oz (28g) Smalls and Micros" and "1 Oz. (28g) Smalls and Micros"; without that a re-spelling would read as a new size.
   5. **Flow Gardens — Smalls** (`flowgardens.com/products.json`) — **rewritten 2026-09-09**. The shop split its single `smalls` handle into one product per type on 2026-08-12, so the type now lives in the PRODUCT title, not the strain name, and a watched type may have no product at all. Scans the whole catalog for smalls/smallz products ("Small Batch" and "Assorted Small Buds" excluded) and alerts both when a smalls product of a watched type is listed and when a new strain is added to one. Configurable via `flowgardens_smalls.allowed_types` (currently `[2]`; there is no Type 2 Smallz product as of 2026-09-09).
   6. **Five Leaf Wellness** (`fiveleafwellness.com`) — polls the WooCommerce **Store API** (`/wp-json/wc/store/v1/products`) and alerts when a product whose authoritative `categories` include a target tier (default `top-shelf`; `mid-tier` excluded) newly appears. Tier membership is re-checked every run, so a product categorised Top Shelf *after* it first drops still alerts once. Configurable via `fiveleafwellness.target_categories`.
-  7. **Beleafer — Indoor Hemp Flower** (`beleafer.com/product-category/hemp-flower/indoor/`) — alerts only when a new product appears AND its **product summary block** contains a "Type 2" designation. Type detection uses `\btype\s*N\b` regex; the scan is scoped to the WooCommerce `product-summary` block so the site's `blfr.type3` Instagram link in the footer does not false-match. The product page is re-checked every run until it matches or an 8h window lapses (see "Site-wide audit" below), so a Type 2 designation added after the product is first listed is not missed. Configurable via `beleafer_indoor.allowed_types`.
+  7. **Beleafer — Indoor Hemp Flower** (`beleafer.com/product-category/hemp-flower/indoor/`) — alerts only when a new product appears AND its **product summary block** contains a "Type 2" designation. Type detection uses `\btype\s*N\b` regex; the scan is scoped to the WooCommerce `product-summary` block so the site's `blfr.type3` Instagram link in the footer does not false-match. The product page is re-checked every run until it matches or an 8h window lapses (see "Site-wide audit" below), so a Type 2 designation added after the product is first listed is not missed. Configurable via `beleafer_indoor.allowed_types`. Every request goes out with a current browser fingerprint (`impersonate: true`); the host 403s anything else, which kept this site dark 2026-09-14 to 2026-10-13 (see "Beleafer's 29-day outage" below).
   8. **High Alpine Genetics** (`highalpinegenetics.com`) — **DISABLED 2026-09-09**: the shop migrated Weebly to Shopify and now sells seeds only, and this adapter suppresses seeds, so it could never alert. Re-enable only if the shop carries flower again; see `disabled_reason` in `config.json`. Historical behaviour: Weebly shop mixing seeds and flower in one search listing; alerts when a new **non-seed** product whose name or description contains a `Type N` matching `allowed_types` (default `[1, 2]`) appears. Seeds are detected by name (`seed`/`fem`/`feminized`) and description cues, then suppressed. Re-checks each not-yet-matched product every run (same helper as Beleafer), so a type designation added after listing is caught.
   9. **Antheia Farms** (`antheiafarms.myshopify.com`) — Shopify collection (`/collections/all/products.json`); alerts when a product becomes purchasable: an existing product going sold-out → available (restock/drop), or a brand-new product appearing already in stock. All products are sold out ahead of the scheduled ~Aug 22 drop, so the first run seeds and an availability transition fires later. A new sold-out product is recorded silently and alerts when it flips available. Added 2026-06-22.
   10. **VERITAS** (`veritasthca.com/veritas-drop-menu/` + its WooCommerce Store API) — **added 2026-10-13, two alerts only**: `ROSIN_5G` when rosin or hash can be bought in 5 g or less, and `EXOTIC_OZ` when an ounce (zip) of flower the vendor labels "Exotic" is on offer. Everything else is silent by design. Polled every 3 minutes. See "VERITAS (2026-10-13)" below before touching it.
@@ -214,8 +214,10 @@ Rules for any adapter that fetches a listing:
   can restructure at any time, and the thing being waited for may not exist
   yet - there was no Type 2 Smallz product on the day this was rewritten.
 - A WAF 403 is about the TLS/HTTP2 fingerprint, not the User-Agent. `http_get`
-  retries once with `curl_cffi` impersonation; do NOT forward our own UA on
-  that retry or the mismatch keeps the 403.
+  retries with `curl_cffi` impersonation, trying each fingerprint in
+  `BROWSER_IMPERSONATE`; do NOT forward our own UA on that retry or the mismatch
+  keeps the 403. A fingerprint can age into a block on its own (Beleafer,
+  2026-10-13), so the list holds unversioned aliases only.
 
 Staleness is the check that found all three: compare each site's
 `last_polled_at`/`first_seen` against now. That catches any reason a site stops
@@ -267,10 +269,27 @@ scheduled task (every 4h, silent when healthy) - see SYSTEM-MODS.md. Decoupling
 without that replacement would recreate the silent-failure problem that hid High
 Alpine for 82 days. Do not remove one without the other.
 
-**Beleafer is expected to flap.** Cloudflare blocks GitHub's runner IPs
-intermittently and the block is not defeated by fingerprint impersonation, which
-only helps when the block keys on the client rather than the address. It
-recovers on its own. Escalate it only after many continuous hours.
+**Beleafer's 29-day outage was a stale fingerprint, not an IP block
+(fixed 2026-10-13).** From 2026-09-14 06:50 UTC every request 403'd,
+impersonated retry included, and it was written off as Cloudflare blocking
+GitHub's runner IPs. It was not. The 403 page comes from the shop's host,
+SiteGround (its `host-header` and `x-proxy-cache-info` response headers;
+Cloudflare only proxies it), and the host refuses outdated Chrome
+fingerprints. From one residential IP, curl_cffi's chrome124, chrome131,
+chrome133a and chrome136 all got 403 while chrome142+, safari and firefox got
+200, and real Chrome loaded the page. The monitor had pinned chrome124.
+
+- `BROWSER_IMPERSONATE` is now the unversioned aliases `("chrome", "safari",
+  "firefox")`, tried in turn. Each alias means curl_cffi's newest target, and
+  the workflow installs the newest curl_cffi every run, so it cannot go stale
+  the same way. Never pin a version again.
+- Beleafer sets `impersonate: true`, so it never opens with a plain `requests`
+  call the host already scores as a bot.
+- Before concluding "the block keys on the address", repeat the request from a
+  residential IP with a current browser fingerprint and in a real browser. That
+  15-minute check would have saved 29 days.
+- It also flapped on runner IPs before September; the 12h escalation window
+  stays until it has held clean for a while.
 
 ## VERITAS (2026-10-13)
 
@@ -279,7 +298,7 @@ A wholesale THCa shop. The brief was narrow on purpose: alert ONLY when (1) rosi
 **Sources.** The drop-menu page (Elementor price lists, production-update cards, free-text production notes) and the WooCommerce Store API. The API is the ground truth for what can be bought: the menu is partly stale (7 of its links were 404s and 4 pointed at sold-out products on deploy day), so a menu line linked to a product counts only while the API lists that product in stock. Unlinked menu lines and notes count while they are on the page.
 
 **Rules that look wrong but are not:**
-- **The cart minimum is not the MOQ.** 33 of the 54 in-stock rosin listings accept a quantity of 1 in the cart (the WooCommerce default) while the menu sells the same product "per gram | 10g MOQ". Treating 1 as "sold by the gram" would have alerted on all of them on day one. A minimum of 1 is no evidence; a deliberate minimum of 2-5 is.
+- **The cart minimum is not the MOQ.** 33 of the 54 in-stock rosin listings accept a quantity of 1 in the cart (the WooCommerce default) while the menu sells the same product "per gram | 10g MOQ", and checkout refuses anything under the 10 g minimum (confirmed by the user, 2026-10-13). Treating 1 as "sold by the gram" would have alerted on all of them on day one. A minimum of 1 is no evidence; a deliberate minimum of 2-5 is.
 - **Lot size is not increment.** The menu writes "20g available - 10g MOQ", "40g Lot", "only 10g". Each size is read in context (MOQ / unit / lot / bare), and bare sizes in descriptions or notes never count.
 - **"Exotic" is the vendor's own grade label**, matched in names, menu titles, tags and menu wording only, never in strain descriptions. The shop sells "AAA Indoor - Purple Pixie Dust Ounces" ($70) and "AAA Indoor Exotic - Cherry Runtz Ounces" ($80); only the second qualifies. The in-stock "A Grade Indoor Smalls - Black Ice (OZ)" is silent for the same reason. To widen, add words to `exotic_keywords`.
 - **An ounce is exactly one ounce**: "28g", "1 oz", "Ounces", "(OZ)", "zip". QPs, "4 oz", "1/2 oz", "half zip" and 3.5 g jars are not.
