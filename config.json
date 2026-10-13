@@ -105,5 +105,24 @@
     "enabled": true,
     "products_json_url": "https://antheiafarms.myshopify.com/collections/all/products.json?limit=250",
     "collection_url": "https://antheiafarms.myshopify.com/collections/all"
+  },
+  "veritas": {
+    "enabled": true,
+    "menu_url": "https://veritasthca.com/veritas-drop-menu/",
+    "products_api_url": "https://veritasthca.com/wp-json/wc/store/v1/products",
+    "max_concentrate_grams": 5,
+    "exotic_keywords": [
+      "exotic"
+    ],
+    "exclude_category_ids": [
+      786295542,
+      786295536,
+      786295535,
+      786295543
+    ],
+    "exclude_category_note": "Store categories neither rule can match, skipped server-side to keep each poll to one API request: thca-sugar-resin, vape, edibles, prerolls. A category not listed here is still fetched.",
+    "realert_after_hours": 12,
+    "min_interval_minutes": 3,
+    "rules_note": "2026-10-13 brief: alert ONLY on (1) rosin or hash buyable in 5 g or less and (2) an ounce of flower the vendor labels Exotic. Vapes, edibles and prerolls never count. A cart minimum of 1 is not a 1 g MOQ (the menu says 10g MOQ on those listings)."
   }
 }

@@ -17,7 +17,7 @@ Nothing outside GitHub needs managing. To pause polling, disable the workflow; t
 
 ## Status — 2026-05-06
 
-- **Multi-site, 9 sites monitored** (config in `config.json`):
+- **Multi-site, 10 sites configured, 9 enabled** (High Alpine disabled; config in `config.json`):
   1. **TYP3 Cannabis** (`typ3cannabis.com/store`) — alerts on new product drops and restocks; ignores known merch.
   2. **Hemp Barn — Living Soil** (`thehempbarn.com/product/livingsoil/`) — alerts only on **new strains** whose section of the product short-description contains `special`, `all time`, or `10/10` (case-insensitive). Other new strains are silently logged.
   3. **Hemp Barn — Organic Soil** (`thehempbarn.com/product/organicsoil/`) — same rule as Living Soil: only new strains with `special`, `all time`, or `10/10` in the description.
@@ -27,6 +27,7 @@ Nothing outside GitHub needs managing. To pause polling, disable the workflow; t
   7. **Beleafer — Indoor Hemp Flower** (`beleafer.com/product-category/hemp-flower/indoor/`) — alerts only when a new product appears AND its **product summary block** contains a "Type 2" designation. Type detection uses `\btype\s*N\b` regex; the scan is scoped to the WooCommerce `product-summary` block so the site's `blfr.type3` Instagram link in the footer does not false-match. The product page is re-checked every run until it matches or an 8h window lapses (see "Site-wide audit" below), so a Type 2 designation added after the product is first listed is not missed. Configurable via `beleafer_indoor.allowed_types`.
   8. **High Alpine Genetics** (`highalpinegenetics.com`) — **DISABLED 2026-09-09**: the shop migrated Weebly to Shopify and now sells seeds only, and this adapter suppresses seeds, so it could never alert. Re-enable only if the shop carries flower again; see `disabled_reason` in `config.json`. Historical behaviour: Weebly shop mixing seeds and flower in one search listing; alerts when a new **non-seed** product whose name or description contains a `Type N` matching `allowed_types` (default `[1, 2]`) appears. Seeds are detected by name (`seed`/`fem`/`feminized`) and description cues, then suppressed. Re-checks each not-yet-matched product every run (same helper as Beleafer), so a type designation added after listing is caught.
   9. **Antheia Farms** (`antheiafarms.myshopify.com`) — Shopify collection (`/collections/all/products.json`); alerts when a product becomes purchasable: an existing product going sold-out → available (restock/drop), or a brand-new product appearing already in stock. All products are sold out ahead of the scheduled ~Aug 22 drop, so the first run seeds and an availability transition fires later. A new sold-out product is recorded silently and alerts when it flips available. Added 2026-06-22.
+  10. **VERITAS** (`veritasthca.com/veritas-drop-menu/` + its WooCommerce Store API) — **added 2026-10-13, two alerts only**: `ROSIN_5G` when rosin or hash can be bought in 5 g or less, and `EXOTIC_OZ` when an ounce (zip) of flower the vendor labels "Exotic" is on offer. Everything else is silent by design. Polled every 3 minutes. See "VERITAS (2026-10-13)" below before touching it.
 - Cloud workflow runs every 5 min on a fresh Ubuntu runner; commits updated `state.json` back to `main`. Verified green after the multi-site upgrade.
 - Local Windows scheduled task: **disabled** (still registered) so cloud is the only sender.
 - Email: aggregated, one per run, sectioned by site. Subject prefix `[Drop Monitor]`.
@@ -35,7 +36,7 @@ Nothing outside GitHub needs managing. To pause polling, disable the workflow; t
 
 `monitor.py` runs through each enabled site once per invocation:
 
-1. **Fetch** site-specific snapshot (HTML scrape for TYP3 + Hemp Barn; Shopify `/products.json` for Caregiver Pharms, Flow Gardens, and Antheia Farms; WooCommerce Store API for Five Leaf Wellness).
+1. **Fetch** site-specific snapshot (HTML scrape for TYP3 + Hemp Barn; Shopify `/products.json` for Caregiver Pharms, Flow Gardens, and Antheia Farms; WooCommerce Store API for Five Leaf Wellness and VERITAS, the latter plus its drop-menu page).
 2. **Diff** against the previous snapshot stored under `state.sites.{site_name}` in `state.json`.
 3. Each adapter emits zero or more typed alerts:
    - `DROP` — TYP3 new in-stock product
@@ -44,6 +45,8 @@ Nothing outside GitHub needs managing. To pause polling, disable the workflow; t
    - `NEW_STRAIN` — Hemp Barn / Flow Gardens new strain option
    - `SMALLS_BACK` — Caregiver ounce of smalls/micros becoming available
    - `NEW_VARIANT` — Caregiver size option never offered on any product before
+   - `ROSIN_5G` — VERITAS rosin/hash buyable in 5 g or less
+   - `EXOTIC_OZ` — VERITAS ounce of flower labelled Exotic
 4. After all sites run, alerts are aggregated into **one email** with a section per site. On Windows it also fires a toast + beep + browser tab per alert.
 5. State is saved atomically. First run for any site only seeds — never alerts.
 6. One site's failure (network blip, parse error) is logged but does not stop other sites from running. Three consecutive real fetch/diff failures for the same enabled site mark the run unhealthy and send Healthchecks a `/fail` ping with a concise diagnostic in the run log. A successful fetch and diff clears that site's counter; intentional `min_interval` skips do neither. SMTP delivery failure is immediately unhealthy. Healthcheck responses are HTTP-status checked.
@@ -268,6 +271,27 @@ Alpine for 82 days. Do not remove one without the other.
 intermittently and the block is not defeated by fingerprint impersonation, which
 only helps when the block keys on the client rather than the address. It
 recovers on its own. Escalate it only after many continuous hours.
+
+## VERITAS (2026-10-13)
+
+A wholesale THCa shop. The brief was narrow on purpose: alert ONLY when (1) rosin or hash can be bought in 5 g or less, or (2) an ounce of exotic flower is offered. Validated against the shop's whole catalog including sold-out history (286 products on 2026-10-13): exactly three would ever have fired, "Zina the MVP Tier 1 Exotic | Pheno Hunt 2g" (a 2 g rosin jar) and the "AAA Indoor Exotic" Cherry Runtz and Dr. Who Ounces. Nothing qualified on deploy day, so the seed run missed nothing.
+
+**Sources.** The drop-menu page (Elementor price lists, production-update cards, free-text production notes) and the WooCommerce Store API. The API is the ground truth for what can be bought: the menu is partly stale (7 of its links were 404s and 4 pointed at sold-out products on deploy day), so a menu line linked to a product counts only while the API lists that product in stock. Unlinked menu lines and notes count while they are on the page.
+
+**Rules that look wrong but are not:**
+- **The cart minimum is not the MOQ.** 33 of the 54 in-stock rosin listings accept a quantity of 1 in the cart (the WooCommerce default) while the menu sells the same product "per gram | 10g MOQ". Treating 1 as "sold by the gram" would have alerted on all of them on day one. A minimum of 1 is no evidence; a deliberate minimum of 2-5 is.
+- **Lot size is not increment.** The menu writes "20g available - 10g MOQ", "40g Lot", "only 10g". Each size is read in context (MOQ / unit / lot / bare), and bare sizes in descriptions or notes never count.
+- **"Exotic" is the vendor's own grade label**, matched in names, menu titles, tags and menu wording only, never in strain descriptions. The shop sells "AAA Indoor - Purple Pixie Dust Ounces" ($70) and "AAA Indoor Exotic - Cherry Runtz Ounces" ($80); only the second qualifies. The in-stock "A Grade Indoor Smalls - Black Ice (OZ)" is silent for the same reason. To widen, add words to `exotic_keywords`.
+- **An ounce is exactly one ounce**: "28g", "1 oz", "Ounces", "(OZ)", "zip". QPs, "4 oz", "1/2 oz", "half zip" and 3.5 g jars are not.
+- **Never counts**: vapes (rosin disposables included), carts, edibles (hash/rosin bon bons announced for 10/15), prerolls (hash-infused included), sugar and live resin (sold by the ounce in 28 g options, so they would otherwise read as zips). Exclusions match names and categories, never descriptions.
+- **Uncategorised rosin** is recognised by the shop's "Tier 1/2/3" grade or, on menu lines, "per gram" pricing; on this site only rosin uses either.
+- **A variable product's stock flag is ANY-variation**, so a qualifying 28 g variation sitting next to an in-stock pound is checked on its own via `/products/{variation_id}`, only for offers that already qualify.
+
+**Rate limit.** WordPress.com's edge returned HTTP 429 after a burst of testing on 2026-10-13. Each poll is therefore two requests (menu + one API page), 1.5 s apart, every 3 minutes: `stock_status=instock,onbackorder` and `category_operator=not_in` on `exclude_category_ids` (sugar/resin, vape, edibles, prerolls) cut the API from three pages to one. A category the config does not list is still fetched. A 429 is an ordinary site failure: counted, retried next poll, escalated by triage only after hours.
+
+**State** (`state.sites.veritas`): `available` = offers qualifying AND buyable at the last run (alerts fire on entry into this set), `alerted_at` (12 h `realert_after_hours` cooldown, so an order placed and cancelled is one event), `seen` (first time each offer qualified, for "new" vs "back in stock" wording), `counts` (parsed products / menu lines / cards / notes; a count that collapses is the first sign of a redesign). Offer keys: `p:<product id>`, `m:<menu title>`, `n:<note text>`.
+
+Tests: `tests/test_veritas.py` (fixtures copied from the live page and catalog).
 
 ## Known caveats
 

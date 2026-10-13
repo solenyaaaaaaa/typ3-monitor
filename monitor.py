@@ -144,6 +144,17 @@ DEFAULT_CONFIG = {
         "products_json_url": "https://antheiafarms.myshopify.com/collections/all/products.json?limit=250",
         "collection_url": "https://antheiafarms.myshopify.com/collections/all",
     },
+    "veritas": {
+        "enabled": True,
+        "menu_url": "https://veritasthca.com/veritas-drop-menu/",
+        "products_api_url": "https://veritasthca.com/wp-json/wc/store/v1/products",
+        "max_concentrate_grams": 5,
+        "exotic_keywords": ["exotic"],
+        # thca-sugar-resin, vape, edibles, prerolls
+        "exclude_category_ids": [786295542, 786295536, 786295535, 786295543],
+        "realert_after_hours": 12,
+        "min_interval_minutes": 3,
+    },
 }
 
 
@@ -1576,6 +1587,740 @@ class AntheiaFarmsSite:
         return {"products": merged, "last_seen": now_iso}, alerts
 
 
+class VeritasSite:
+    """VERITAS (veritasthca.com): a WooCommerce wholesale shop plus a curated
+    "drop menu" page. Alerts on exactly two things, per the brief of
+    2026-10-13, and on nothing else:
+
+      ROSIN_5G   rosin or hash that can be bought in 5 g or less
+      EXOTIC_OZ  an ounce (zip) of flower the vendor labels "Exotic"
+
+    Silent by design: per-gram wholesale rosin with a 10 g / 28 g MOQ (the
+    entire rosin menu on 2026-10-13), pounds and QPs, sugar and live resin,
+    vapes including rosin disposables, edibles including the hash/rosin
+    chocolates announced for 10/15, and prerolls including hash-infused ones.
+
+    Two sources, because each misses things the other has:
+      * The WooCommerce Store API is the ground truth for what can be bought
+        right now. The menu is partly stale: on 2026-10-13 seven of its links
+        pointed at deleted products (404) and four at sold-out ones, so a menu
+        line that links to a product counts only while the store lists that
+        product as in stock.
+      * The menu page carries the vendor's own wording ("10g MOQ", "per oz"),
+        production notes, and lots that have no store product at all.
+
+    Never read the cart minimum as the MOQ. Most rosin listings accept a
+    quantity of 1 (`add_to_cart.minimum` 1, the WooCommerce default) while the
+    menu prices the same product "$27.00 per gram | 10g MOQ". Reading 1 as
+    "sold by the gram" would have alerted on 33 listings on day one. A
+    minimum of 1 is no evidence either way; only a stated size or MOQ is.
+
+    Every rule is re-evaluated from fresh data on every run, so a size option
+    or wording added after a product first appears still fires.
+    """
+    name = "veritas"
+    label = "VERITAS"
+
+    MENU_URL = "https://veritasthca.com/veritas-drop-menu/"
+    API_URL = "https://veritasthca.com/wp-json/wc/store/v1/products"
+    # Descriptions are most of the payload, but they are where the vendor
+    # writes jar sizes and MOQs ("2 Gram Jar", "MOQ 1"), so they stay in.
+    API_FIELDS = ("id,name,slug,permalink,type,categories,tags,is_in_stock,"
+                  "is_purchasable,add_to_cart,attributes,variations,"
+                  "short_description,description,prices")
+
+    # ---- page structure (Elementor) ----
+    PRICE_LIST_RE = re.compile(r'class="elementor-price-list-item"')
+    LI_RE = re.compile(r"<li\b([^>]*)>(.*?)</li>", re.DOTALL | re.IGNORECASE)
+    TITLE_RE = re.compile(r'elementor-price-list-title"[^>]*>(.*?)</span>', re.DOTALL)
+    PRICE_RE = re.compile(r'elementor-price-list-price"[^>]*>(.*?)</span>', re.DOTALL)
+    DESC_RE = re.compile(r'elementor-price-list-description"[^>]*>(.*?)</p>', re.DOTALL)
+    HREF_RE = re.compile(r'href="([^"]*)"')
+    IMAGE_WIDGET_RE = re.compile(r'data-widget_type="image\.default".*?(<img\b[^>]*>)', re.DOTALL)
+    HEADING_RE = re.compile(r'class="elementor-heading-title[^"]*"[^>]*>(.*?)</h[1-6]>', re.DOTALL)
+    CARD_RE = re.compile(r'<article\s+class="vb-card"(.*?)</article>', re.DOTALL)
+    TEXT_WIDGET_RE = re.compile(
+        r'data-widget_type="text-editor\.default"[^>]*>(.*?)'
+        r'(?=data-widget_type=|<div class="elementor-element|<section\b|\Z)', re.DOTALL)
+    PRODUCT_SLUG_RE = re.compile(r"/product/([^/?#\"]+)")
+
+    # ---- sizes ----
+    _GRAM = r"(?:grams?|gms?|gr|g)"
+    # The lookbehind refuses "/" so the "2 g" inside "1/2 g" is not read as 2 g.
+    SIZE_RE = re.compile(r"(?<![\w./])(\d+(?:\.\d+)?|\.\d+)\s*" + _GRAM + r"(?!\w)", re.IGNORECASE)
+    SIZE_WORD_PATTERNS = (
+        (re.compile(r"(?<![\w./])1\s*/\s*2\s*" + _GRAM + r"(?!\w)"
+                    r"|\bhalf(?:\s+a)?[\s-]*" + _GRAM + r"(?!\w)", re.IGNORECASE), 0.5),
+        # "1/8" alone is as likely a date as a size, so it needs "th" or "oz".
+        (re.compile(r"(?<![\w./])1\s*/\s*8\s*(?:th|oz|ounces?)(?!\w)|\beighths?\b", re.IGNORECASE), 3.5),
+        (re.compile(r"(?<![\w./])1\s*/\s*4\s*(?:oz|ounces?)(?!\w)"
+                    r"|\bquarter[\s-]*(?:oz|ounces?)(?!\w)", re.IGNORECASE), 7.0),
+        (re.compile(r"(?<![\w./])1\s*/\s*2\s*(?:oz|ounces?)(?!\w)"
+                    r"|\bhalf[\s-]*(?:oz|ounces?|zips?)(?!\w)", re.IGNORECASE), 14.0),
+    )
+    # What a size MEANS depends on the words around it. The menu writes the
+    # lot size and the MOQ side by side ("20g available - 10g MOQ", "40g Lot -
+    # 10g MOQ", "only 10g"), so reading every number as the amount you can buy
+    # would be wrong in both directions.
+    _SEP = r"\s*(?:[-–—:|]\s*)?"
+    MOQ_AFTER_RE = re.compile(_SEP + r"(?:moq|minimum|min\b|min\.)", re.IGNORECASE)
+    MOQ_BEFORE_RE = re.compile(
+        r"\b(?:moq|minimum(?:\s+order)?(?:\s+quantity)?(?:\s+of)?|min\.?)\s*(?:is|of)?\s*[:=-]?\s*$",
+        re.IGNORECASE)
+    UNIT_AFTER_RE = re.compile(
+        _SEP + r"(?:jars?|each|ea\b|units?|increments?|options?|sizes?|packs?|containers?"
+        r"|portions?|samples?|retail|tins?|vials?)\b|\s*(?:[-–—:=@]|for)\s*\$",
+        re.IGNORECASE)
+    LOT_AFTER_RE = re.compile(
+        _SEP + r"(?:lots?|available|avail\b|left|remaining|in\s+stock|total|on\s+hand|batch(?:es)?)\b",
+        re.IGNORECASE)
+    LOT_BEFORE_RE = re.compile(r"\b(?:only|total(?:\s+of)?|lot\s+of|batch\s+of)\s*$", re.IGNORECASE)
+    UNIT_BEFORE_RE = re.compile(
+        r"(?:\bin|\bper|/|\bof|\bsold\s+in|\bavailable\s+in|\bcomes\s+in|\boffered\s+in)\s*$",
+        re.IGNORECASE)
+    # "MOQ 1", "MOQ 100": a count of units, never grams.
+    MOQ_COUNT_RE = re.compile(
+        r"\b(?:moq|minimum\s+order(?:\s+quantity)?|min\.?\s+order)\s*(?:is|of)?\s*[:=-]?\s*"
+        r"(\d+)(?![\d.]|\s*(?:grams?|gms?|gr|g|mg|kg|kilos?|lbs?|pounds?|oz|ounces?)(?!\w))",
+        re.IGNORECASE)
+    ANY_AMOUNT_RE = re.compile(
+        r"\bno\s+(?:moq|minimums?)\b|\bby\s+the\s+gram\b|\bany\s+(?:amount|quantity|weight)\b"
+        r"|\bsingle\s+grams?\b|\bgram\s+(?:jars?|increments?)\b", re.IGNORECASE)
+    # Exactly one ounce. "QP (4 oz)", "8 oz", "1/2 oz" and "half zip" are not.
+    OUNCE_RE = re.compile(
+        r"(?<![\w./])(?:(\d+(?:\.\d+)?)\s*)?(?:oz|ozs|ounces?)(?!\w)"
+        r"|\b(?:half[\s-]*)?zips?\b|\bzipper\b"
+        r"|(?<![\w./])28\s*(?:grams?|gms?|gr|g)(?!\w)", re.IGNORECASE)
+
+    # ---- what a line is ----
+    # Matched against product names and menu titles only, never descriptions:
+    # a rosin write-up may mention carts or prerolls without being one.
+    EXCLUDE_RE = re.compile(
+        r"\b(?:vapes?|vaporizers?|carts?|cartridges?|disposables?|pods?|pens?|510|aio"
+        r"|all[\s-]in[\s-]one|batter(?:y|ies)|devices?|ikrusher"
+        r"|pre[\s-]?rolls?|joints?|blunts?|hash\s*holes?"
+        r"|infused|infusions?|edibles?|gumm(?:y|ies)|bon\s*bons?|honey\s*sticks?|capsules?"
+        r"|tinctures?|syrups?|beverages?|drinks?|topicals?|lotions?|balms?|salves?)\b"
+        r"|\d\s*mg\b", re.IGNORECASE)
+    EXCLUDED_CATS = {"vape", "vapes", "edibles", "prerolls", "pre-rolls", "topicals"}
+    CONCENTRATE_RE = re.compile(
+        r"\b(?:rosin|hash|full\s*melt|temple\s*balls?|piatt?ell?a|dry\s*sift)\b", re.IGNORECASE)
+    # "live-rosin" is the update cards' tag; "rosin" the store category, which
+    # also covers listings whose names never say rosin ("Las Vegas Tier 1 -
+    # Banana Punch").
+    CONCENTRATE_CATS = {"rosin", "live-rosin"}
+    # Not rosin or hash, and not flower either. Sugar and live resin are sold
+    # by the ounce in 28 g options, so without this they would read as zips.
+    OTHER_CONCENTRATE_RE = re.compile(
+        r"\b(?:resins?|sugars?|diamonds?|sauce|badder|batter|budder|wax|shatter|crumble"
+        r"|distillate|isolate|extracts?|concentrates?|kief|sift|shake|trim)\b", re.IGNORECASE)
+    NON_FLOWER_CATS = {"rosin", "live-rosin", "extracts", "thca-sugar-resin",
+                       "vape", "vapes", "edibles", "prerolls", "pre-rolls"}
+    FLOWER_RE = re.compile(
+        r"\b(?:flower|buds?|nugs?|indoor|mixed\s*light|greenhouse|light\s*deps?|deps"
+        r"|smalls|bigs|popcorn|outdoor|sun\s*grown|zips?)\b", re.IGNORECASE)
+    # On this site only rosin is priced per gram (flower is per lb/QP/oz,
+    # sugar and resin per oz, vapes and gummies each), so an unlinked menu
+    # line priced per gram is rosin even when its title never says so.
+    PER_GRAM_RE = re.compile(r"\bper\s+(?:gram|g)\b|/\s*(?:gram|g)\b", re.IGNORECASE)
+    # Likewise "Tier 1/2/3" is the rosin grade here (flower is "A Grade" /
+    # "AAA"). It is the only signal on uncategorised rosin: "LV Lab Tier 1 -
+    # Lemon Limez" has no category and never says rosin.
+    TIER_RE = re.compile(r"\btier\s*[123]\b", re.IGNORECASE)
+    NON_CONCENTRATE_CATS = {"flower", "thca-sugar-resin"}
+
+    SOURCE_LABEL = {"menu": "drop menu", "card": "update card", "note": "production note"}
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.menu_url = cfg.get("menu_url", self.MENU_URL)
+        self.api_url = cfg.get("products_api_url", self.API_URL).rstrip("/")
+        self.max_grams = float(cfg.get("max_concentrate_grams", 5))
+        # The vendor's own grade label. It separates "AAA Indoor - Purple
+        # Pixie Dust Ounces" ($70) from "AAA Indoor Exotic - Cherry Runtz
+        # Ounces" ($80), which is the line the brief draws.
+        words = cfg.get("exotic_keywords") or ["exotic"]
+        self.exotic_re = re.compile(
+            r"\b(?:%s)s?\b" % "|".join(re.escape(w) for w in words), re.IGNORECASE)
+
+    # ---- small text helpers ----
+
+    @staticmethod
+    def _clean(fragment):
+        text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", fragment or "",
+                      flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = htmllib.unescape(text).replace("\xa0", " ")
+        return re.sub(r"\s+", " ", text).strip()
+
+    @staticmethod
+    def _words(text):
+        return re.findall(r"[a-z]+", (text or "").lower())
+
+    @staticmethod
+    def _norm(text):
+        return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()
+
+    @classmethod
+    def _image_words(cls, img_tag):
+        src = re.search(r'src="([^"]+)"', img_tag)
+        alt = re.search(r'alt="([^"]*)"', img_tag)
+        stem = src.group(1).split("?")[0].rsplit("/", 1)[-1].rsplit(".", 1)[0] if src else ""
+        return cls._words(stem + " " + (htmllib.unescape(alt.group(1)) if alt else ""))
+
+    def _slug_of(self, href):
+        if not href or href.startswith("#"):
+            return None
+        m = self.PRODUCT_SLUG_RE.search(href)
+        return m.group(1).lower() if m else None
+
+    @staticmethod
+    def _price(prices):
+        prices = prices or {}
+        try:
+            unit = 10 ** int(prices.get("currency_minor_unit", 2))
+            rng = prices.get("price_range")
+            if rng:
+                return "$%.2f-$%.2f" % (int(rng["min_amount"]) / unit,
+                                        int(rng["max_amount"]) / unit)
+            return "$%.2f" % (int(prices["price"]) / unit)
+        except (KeyError, TypeError, ValueError):
+            return ""
+
+    # ---- fetch ----
+
+    def fetch(self, session, ua, timeout):
+        resp = http_get(session, self.menu_url, ua, timeout,
+                        expect_pattern=self.PRICE_LIST_RE)
+        menu, cards, notes = self._parse_menu(resp.text)
+        if not menu:
+            # The page has been an Elementor price list since at least
+            # 2026-10-13. Nothing parsed means the markup or the URL changed;
+            # raise so the health counter sees it instead of a quiet page.
+            raise RuntimeError("no price-list items parsed from %s; menu markup may "
+                               "have changed" % self.menu_url)
+        time.sleep(1.5)  # spacing for the rate limit; see _fetch_products
+        products = self._fetch_products(session, ua, timeout)
+        snapshot = {"products": products, "menu": menu, "cards": cards, "notes": notes}
+        self._fetch_variation_stock(session, ua, timeout, snapshot)
+        return snapshot
+
+    def _fetch_products(self, session, ua, timeout):
+        """Every product the store lists as buyable right now, minus the
+        categories neither rule can ever match.
+
+        Both filters run server-side to keep this to one request. The shop
+        serves the API uncached (~3 s a page) from WordPress.com, whose edge
+        answered 429 Too Many Requests on 2026-10-13 after a short burst of
+        testing. Out of stock: an alert needs something to buy. Excluded
+        categories (sugar/resin, vape, edibles, prerolls by ID in config):
+        that took 286 products to 74, three pages to one. A category the
+        config does not name is still fetched, so a new one costs load, never
+        a missed listing.
+        """
+        products = []
+        max_pages = int(self.cfg.get("max_pages", 10))
+        exclude = ",".join(str(int(c)) for c in self.cfg.get("exclude_category_ids") or [])
+        query = "per_page=100&stock_status=instock,onbackorder&_fields=" + self.API_FIELDS
+        if exclude:
+            query += "&category=%s&category_operator=not_in" % exclude
+        page = 1
+        while True:
+            resp = http_get(session, "%s?%s&page=%d" % (self.api_url, query, page),
+                            ua, timeout, expect_json=True)
+            batch = resp.json()
+            if not isinstance(batch, list):
+                raise RuntimeError("store API did not return a product list")
+            products.extend(self._compact_product(raw) for raw in batch
+                            if raw.get("id") is not None)
+            try:
+                total_pages = int(resp.headers.get("X-WP-TotalPages", 1))
+            except (TypeError, ValueError):
+                total_pages = 1
+            if page >= min(total_pages, max_pages):
+                break
+            page += 1
+            time.sleep(1.5)
+        if not products:
+            # 74 matching products were in stock on 2026-10-13. Zero is a
+            # broken feed, not an empty shop, and must not diff to "no change".
+            raise RuntimeError("store API returned no in-stock products; "
+                               "format may have changed")
+        return products
+
+    def _compact_product(self, raw):
+        variations = []
+        for v in raw.get("variations") or []:
+            label = " ".join(
+                self._clean(a.get("value")).strip(" \"'“”")
+                for a in v.get("attributes") or []).strip()
+            variations.append({"id": v.get("id"), "label": label})
+        if variations:
+            options = [v["label"] for v in variations]
+        else:
+            # Simple products still list their weights as attribute terms
+            # ("Live Rosin - Weight: 10g, 28g, 56g, 100g"). That is the
+            # vendor saying what sizes it sells, so it counts.
+            options = ["%s: %s" % (self._clean(a.get("name")), self._clean(t.get("name")))
+                       for a in raw.get("attributes") or [] for t in a.get("terms") or []]
+        add_to_cart = raw.get("add_to_cart") or {}
+        try:
+            cart_min = int(add_to_cart.get("minimum") or 1)
+        except (TypeError, ValueError):
+            cart_min = 1
+        return {
+            "id": raw["id"],
+            "slug": (raw.get("slug") or "").lower(),
+            "name": self._clean(raw.get("name")),
+            "url": raw.get("permalink") or self.menu_url,
+            "cats": sorted({(c.get("slug") or "").lower()
+                            for c in raw.get("categories") or []} - {""}),
+            "tags": [self._clean(t.get("name") or t.get("slug"))
+                     for t in raw.get("tags") or []],
+            "in_stock": bool(raw.get("is_in_stock")) and bool(raw.get("is_purchasable", True)),
+            "cart_min": cart_min,
+            "options": options,
+            "variations": variations,
+            "short": self._clean(raw.get("short_description")),
+            "desc": self._clean(raw.get("description")),
+            "price": self._price(raw.get("prices")),
+            "variation_stock": {},
+        }
+
+    def _fetch_variation_stock(self, session, ua, timeout, snapshot):
+        """Per-variation stock for offers that qualify on SOME variations.
+
+        A variable product reads in stock when ANY variation is, so an exotic
+        strain sold as 28 g / QP / LB would read "in stock" while only the
+        pound is (PROJECT.md: never aggregate availability across variants).
+        Only offers that already qualify are looked up, so a normal run
+        makes no extra requests at all.
+        """
+        cap = int(self.cfg.get("max_variation_checks_per_run", 10))
+        checked = 0
+        for offer in self._offers(snapshot).values():
+            product = offer["product"]
+            if product is None or not product["variations"]:
+                continue
+            verdict = self._evaluate(offer)
+            vids = (verdict or {}).get("variation_ids") or []
+            if not vids or set(vids) >= {v["id"] for v in product["variations"]}:
+                continue
+            for vid in vids:
+                if checked >= cap:
+                    logging.warning("[%s] variation stock lookups capped at %d this run",
+                                    self.name, cap)
+                    return
+                checked += 1
+                time.sleep(1.5)  # same rate-limit spacing as the catalog pages
+                try:
+                    resp = http_get(session, "%s/%s?_fields=id,is_in_stock,is_purchasable"
+                                    % (self.api_url, vid), ua, timeout, expect_json=True)
+                    data = resp.json()
+                    product["variation_stock"][vid] = (
+                        bool(data.get("is_in_stock")) and bool(data.get("is_purchasable", True)))
+                except Exception as exc:
+                    logging.warning("[%s] stock lookup for variation %s failed: %s",
+                                    self.name, vid, exc)
+
+    def _parse_menu(self, html_text):
+        """Price-list lines, production-update cards and free-text notes from
+        the page's own Elementor document (site header and footer excluded)."""
+        start = max(html_text.find('data-elementor-type="wp-page"'), 0)
+        end = html_text.find('data-elementor-type="footer"', start)
+        doc = html_text[start:end if end > 0 else len(html_text)]
+
+        # Lists are labelled by banner IMAGES ("Tier-1-rosin.png",
+        # "VERITAS-FLOWER-MENU.png"), not text, so a banner's file name and
+        # alt text are the only words a list has. A list with no banner of its
+        # own belongs to the one above it.
+        headers = [(m.start(), " ".join(self._image_words(m.group(1))))
+                   for m in self.IMAGE_WIDGET_RE.finditer(doc)]
+        headers += [(m.start(), " ".join(self._words(self._clean(m.group(1)))))
+                    for m in self.HEADING_RE.finditer(doc)]
+        headers.sort()
+
+        def section_at(pos):
+            label = ""
+            for hpos, words in headers:
+                if hpos > pos:
+                    break
+                label = words
+            return label
+
+        menu = []
+        for m in self.LI_RE.finditer(doc):
+            attrs, body = m.group(1), m.group(2)
+            if ("elementor-price-list-item" not in attrs
+                    and "elementor-price-list-item" not in body[:300]):
+                continue
+            title = self.TITLE_RE.search(body)
+            if not title:
+                continue
+            price = self.PRICE_RE.search(body)
+            desc = self.DESC_RE.search(body)
+            href = self.HREF_RE.search(attrs + body[:300])
+            menu.append({
+                "source": "menu",
+                "title": self._clean(title.group(1)),
+                "texts": [self._clean(price.group(1)) if price else "",
+                          self._clean(desc.group(1)) if desc else ""],
+                "href": href.group(1) if href else None,
+                "section": section_at(m.start()),
+                "cats": [],
+            })
+
+        cards = []
+        for m in self.CARD_RE.finditer(doc):
+            block = m.group(0)
+            title = re.search(r'vb-card__title"[^>]*>(.*?)</h\d>', block, re.DOTALL)
+            if not title:
+                continue
+            note = re.search(r'vb-card__note"[^>]*>(.*?)</p>', block, re.DOTALL)
+            price = re.search(r'vb-card__price"[^>]*>(.*?)</p>', block, re.DOTALL)
+            badge = re.search(r'vb-badge[^"]*"[^>]*>(.*?)</span>', block, re.DOTALL)
+            href = re.search(r'class="vb-btn"[^>]*href="([^"]+)"', block)
+            cats = re.search(r'data-vb-cats="([^"]*)"', block)
+            cards.append({
+                "source": "card",
+                "title": self._clean(title.group(1)),
+                "texts": [self._clean(x.group(1)) if x else "" for x in (note, price, badge)],
+                "href": href.group(1) if href else None,
+                "section": "",
+                "cats": (cats.group(1).lower().split() if cats else []),
+            })
+
+        notes = []
+        for m in self.TEXT_WIDGET_RE.finditer(doc):
+            for chunk in re.split(r"</li>|</p>|<br\s*/?>", m.group(1), flags=re.IGNORECASE):
+                text = self._clean(chunk)
+                if len(text) >= 4:
+                    notes.append({"source": "note", "title": text[:400], "texts": [],
+                                  "href": None, "section": "", "cats": []})
+        return menu, cards, notes
+
+    # ---- evaluation ----
+
+    @classmethod
+    def _size_context(cls, text, start, end):
+        after = text[end:end + 30]
+        before = text[max(0, start - 30):start]
+        if cls.MOQ_AFTER_RE.match(after) or cls.MOQ_BEFORE_RE.search(before):
+            return "moq"
+        if cls.UNIT_AFTER_RE.match(after):
+            return "unit"
+        if cls.LOT_AFTER_RE.match(after) or cls.LOT_BEFORE_RE.search(before):
+            return "lot"
+        if cls.UNIT_BEFORE_RE.search(before):
+            return "unit"
+        return "bare"
+
+    @classmethod
+    def _size_mentions(cls, text):
+        """(grams, context, snippet) for every size in `text`; context is
+        "moq", "unit" (a size it is sold in), "lot" (how much exists) or
+        "bare" (no telling)."""
+        found = [(float(m.group(1)), m) for m in cls.SIZE_RE.finditer(text or "")]
+        for rx, grams in cls.SIZE_WORD_PATTERNS:
+            found.extend((grams, m) for m in rx.finditer(text or ""))
+        return [(grams, cls._size_context(text, m.start(), m.end()), m.group(0).strip())
+                for grams, m in found]
+
+    @classmethod
+    def _ounce_mentions(cls, text):
+        hits = []
+        for m in cls.OUNCE_RE.finditer(text or ""):
+            token = m.group(0).strip()
+            before = text[max(0, m.start() - 12):m.start()]
+            if token.lower().startswith("half"):
+                continue
+            if re.search(r"(?:half|quarter|eighth)[\s-]*$|\d\s*/\s*\d+\s*(?:th)?\s*$",
+                         before, re.IGNORECASE):
+                continue
+            count = m.group(1)
+            if count is None and not token.startswith("28"):
+                lead = re.search(r"(\d+(?:\.\d+)?)\s*$", before)
+                count = lead.group(1) if lead else None
+            if count is not None and float(count) != 1.0:
+                continue
+            hits.append(token)
+        return hits
+
+    def _min_purchase(self, source="store", ident="", options=(), texts=(), cart_min=None,
+                      ident_label="name", bare_ident=True):
+        """Smallest amount, in grams, that one source says can be bought.
+
+        Returns (grams, evidence), or (None, None) when the source says
+        nothing usable. A stated gram MOQ wins; a unit size ("2 Gram Jar", a
+        "2g" option) is multiplied by any count minimum (an "MOQ 10" of 1 g
+        jars is 10 g); a cart minimum of 2-5 counts because someone set it on
+        purpose, and the default of 1 does not.
+        """
+        units, moq_g, moq_n, any_amount = [], [], [], []
+        blocks = ([(ident, "%s %s" % (source, ident_label), bare_ident)]
+                  + [(o, "%s option" % source, True) for o in options]
+                  + [(t, "%s text" % source, False) for t in texts])
+        for text, where, bare_counts in blocks:
+            if not text:
+                continue
+            for grams, ctx, snippet in self._size_mentions(text):
+                evidence = '%s "%s"' % (where, snippet)
+                if ctx == "moq":
+                    moq_g.append((grams, evidence + " MOQ"))
+                elif ctx == "unit" or (ctx == "bare" and bare_counts):
+                    units.append((grams, evidence))
+            for m in self.MOQ_COUNT_RE.finditer(text):
+                moq_n.append((int(m.group(1)), '%s "%s"' % (where, m.group(0).strip())))
+            m = self.ANY_AMOUNT_RE.search(text)
+            if m:
+                any_amount.append('%s "%s"' % (where, m.group(0).strip()))
+        cart = cart_min if cart_min and cart_min > 1 else None
+        cart_why = "cart minimum %d" % cart if cart else None
+        if moq_g:
+            grams, why = min(moq_g)
+            if cart and not units and cart > grams:
+                return float(cart), cart_why
+            return grams, why
+        if units:
+            size, why = min(units)
+            count = max([1] + [n for n, _ in moq_n] + ([cart] if cart else []))
+            if count > 1:
+                return size * count, "%s x minimum %d" % (why, count)
+            return size, why
+        if moq_n:
+            n, why = min(moq_n)
+            if cart and cart > n:
+                return float(cart), cart_why
+            return float(n), why
+        if any_amount:
+            return (float(cart), cart_why) if cart else (1.0, any_amount[0])
+        if cart:
+            return float(cart), cart_why
+        return None, None
+
+    def _offers(self, snapshot):
+        """Group every line into offers keyed by the thing you would buy.
+
+        A menu line or update card that links to a store product joins that
+        product's offer, so one listing never alerts twice. A link to a
+        product the store does not list as in stock (sold out, or deleted)
+        means the line cannot be bought right now and is dropped.
+        """
+        products = snapshot.get("products", [])
+        by_slug = {p["slug"]: p for p in products if p.get("slug")}
+        offers = {"p:%s" % p["id"]: {"product": p, "items": [], "title": p["name"],
+                                      "url": p["url"], "price": p["price"]}
+                  for p in products}
+        lines = snapshot.get("menu", []) + snapshot.get("cards", []) + snapshot.get("notes", [])
+        for item in lines:
+            slug = self._slug_of(item.get("href"))
+            if slug:
+                product = by_slug.get(slug)
+                if product is not None:
+                    offers["p:%s" % product["id"]]["items"].append(item)
+                continue
+            key = ("n:" if item["source"] == "note" else "m:") + self._norm(item["title"])[:100]
+            # Menu texts are [price, description]; card texts [note, price, badge].
+            price = {"menu": 0, "card": 1}.get(item["source"])
+            offer = offers.setdefault(key, {
+                "product": None, "items": [], "title": item["title"], "url": self.menu_url,
+                "price": item["texts"][price] if price is not None else "",
+            })
+            offer["items"].append(item)
+        return offers
+
+    def _evaluate(self, offer):
+        """{"kind", "why", "variation_ids"} if the offer meets a rule, else None.
+
+        Stock is judged separately (_available), so a listing that qualifies
+        while sold out alerts the moment it is back.
+        """
+        product = offer["product"]
+        items = offer["items"]
+        ident = " | ".join(([product["name"]] if product else []) + [i["title"] for i in items])
+        section = " ".join(i["section"] for i in items if i.get("section"))
+        if product is not None:
+            # The store's categories, not the update cards' tags: a rosin card
+            # on 2026-10-13 was tagged "flower".
+            cats = set(product["cats"])
+        else:
+            cats = {c for i in items for c in i.get("cats", [])}
+        if self.EXCLUDE_RE.search(ident) or cats & self.EXCLUDED_CATS:
+            return None
+        if self._is_concentrate(product, items, ident, section, cats):
+            return self._rosin_verdict(product, items)
+        if self._is_flower(product, ident, section, cats):
+            return self._ounce_verdict(product, items, ident, section)
+        return None
+
+    def _is_concentrate(self, product, items, ident, section, cats):
+        """Rosin or hash. Live resin and sugar are neither."""
+        if (self.CONCENTRATE_RE.search(ident) or self.CONCENTRATE_RE.search(section)
+                or cats & self.CONCENTRATE_CATS):
+            return True
+        if cats & self.NON_CONCENTRATE_CATS:
+            return False
+        if self.OTHER_CONCENTRATE_RE.search(ident + " " + section) or self.FLOWER_RE.search(ident):
+            return False
+        return bool(self.TIER_RE.search(ident)
+                    or (product is None
+                        and any(self.PER_GRAM_RE.search(t) for i in items for t in i["texts"])))
+
+    def _is_flower(self, product, ident, section, cats):
+        if product is not None and product["cats"]:
+            return ("flower" in cats
+                    or (not cats & self.NON_FLOWER_CATS
+                        and bool(self.FLOWER_RE.search(product["name"]))))
+        if self.OTHER_CONCENTRATE_RE.search(ident + " " + section):
+            return False
+        return bool("flower" in cats or self.FLOWER_RE.search(ident)
+                    or self.FLOWER_RE.search(section))
+
+    def _rosin_verdict(self, product, items):
+        cart = product["cart_min"] if product else None
+        sources = []
+        if product is not None:
+            sources.append(({"ident": product["name"],
+                             "texts": [product["short"], product["desc"]]}, None))
+            if product["options"]:
+                vids = [v["id"] for v in product["variations"]
+                        if any(g <= self.max_grams for g, _, _ in self._size_mentions(v["label"]))]
+                sources.append(({"options": product["options"]},
+                                vids if product["variations"] else None))
+        for item in items:
+            note = item["source"] == "note"
+            # A note is prose: "we pressed 5g" is not a 5 g unit for sale.
+            sources.append(({"source": self.SOURCE_LABEL[item["source"]],
+                             "ident": item["title"], "texts": item["texts"],
+                             "ident_label": "text" if note else "title",
+                             "bare_ident": not note}, None))
+        for kwargs, vids in sources:
+            grams, why = self._min_purchase(cart_min=cart, **kwargs)
+            if grams is not None and grams <= self.max_grams:
+                return {"kind": "ROSIN_5G", "why": "buyable in %g g: %s" % (grams, why),
+                        "variation_ids": vids}
+        return None
+
+    def _ounce_verdict(self, product, items, ident, section):
+        # Exotic only from names, titles, tags and the vendor's own menu and
+        # card wording -- never from store descriptions, which describe the
+        # strain ("an exotic cross of...") rather than grade it.
+        exotic_texts = [ident, section] + [t for i in items for t in i["texts"]]
+        if product is not None:
+            exotic_texts += product["tags"] + product["cats"]
+        if not any(self.exotic_re.search(t) for t in exotic_texts if t):
+            return None
+        whole = [("%s %s" % (self.SOURCE_LABEL[i["source"]], "text" if n else "title"), t)
+                 for i in items for n, t in enumerate([i["title"]] + i["texts"])]
+        if product is not None:
+            whole = [("store name", product["name"]),
+                     ("store description", product["short"])] + whole
+        whole.append(("menu section", section))
+        for where, text in whole:
+            hits = self._ounce_mentions(text)
+            if hits:
+                return {"kind": "EXOTIC_OZ", "why": 'ounce: %s "%s"' % (where, hits[0]),
+                        "variation_ids": None}
+        if product is not None and product["variations"]:
+            matching = [v for v in product["variations"] if self._ounce_mentions(v["label"])]
+            if matching:
+                return {"kind": "EXOTIC_OZ",
+                        "why": 'ounce: store option "%s"' % matching[0]["label"],
+                        "variation_ids": [v["id"] for v in matching]}
+        elif product is not None:
+            matching = [o for o in product["options"] if self._ounce_mentions(o)]
+            if matching:
+                return {"kind": "EXOTIC_OZ", "why": 'ounce: store option "%s"' % matching[0],
+                        "variation_ids": None}
+        return None
+
+    @staticmethod
+    def _available(offer, verdict):
+        product = offer["product"]
+        if product is None:
+            return True  # a menu line or note with no store product: listed = offered
+        if not product["in_stock"]:
+            return False
+        vids = verdict.get("variation_ids")
+        if not vids or set(vids) >= {v["id"] for v in product["variations"]}:
+            return True
+        known = [product["variation_stock"][v] for v in vids if v in product["variation_stock"]]
+        # Lookup failed: fall back to the product's own flag rather than go
+        # blind on the one listing that matters.
+        return any(known) if known else True
+
+    def diff(self, prev_state, current):
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        prev_available = prev_state.get("available") or {}
+        alerted_at = dict(prev_state.get("alerted_at") or {})
+        seen = dict(prev_state.get("seen") or {})
+        # A listing that drops out and comes straight back (an order placed
+        # and cancelled, a stock correction, the menu being edited) is one
+        # event, not two.
+        cooldown = timedelta(hours=float(self.cfg.get("realert_after_hours", 12)))
+
+        qualifying = {}
+        for key, offer in sorted(self._offers(current).items()):
+            verdict = self._evaluate(offer)
+            if verdict is not None and self._available(offer, verdict):
+                qualifying[key] = (offer, verdict)
+        if qualifying:
+            logging.info("[%s] on offer and qualifying: %s", self.name,
+                         "; ".join("%s %s" % (v["kind"], o["title"])
+                                   for o, v in qualifying.values()))
+
+        alerts = []
+        for key, (offer, verdict) in sorted(qualifying.items()):
+            if key in prev_available:
+                continue  # on offer since the last run: already told
+            last = alerted_at.get(key)
+            if last:
+                try:
+                    if now - datetime.fromisoformat(last) < cooldown:
+                        logging.info("[%s] %s re-qualified within %s of its last alert; "
+                                     "not re-sent", self.name, key, cooldown)
+                        continue
+                except ValueError:
+                    pass
+            if offer["product"] is not None:
+                status = "back in stock" if key in seen else "new"
+            elif key.startswith("n:"):
+                status = "production note on the drop menu"
+            else:
+                status = "on the drop menu, no store listing"
+            alerts.append({
+                "site": self.name, "label": self.label,
+                "kind": verdict["kind"], "title": offer["title"][:200],
+                "url": offer["url"],
+                "details": "; ".join(x for x in (verdict["why"], offer["price"], status) if x),
+            })
+            alerted_at[key] = now_iso
+
+        for key in qualifying:
+            seen.setdefault(key, now_iso)
+        horizon = now - timedelta(days=60)
+
+        def recent(iso):
+            try:
+                return datetime.fromisoformat(iso) >= horizon
+            except (TypeError, ValueError):
+                return False
+
+        new_state = {
+            "v": 1,
+            "available": {key: {"kind": verdict["kind"], "title": offer["title"][:160]}
+                          for key, (offer, verdict) in qualifying.items()},
+            "alerted_at": {k: v for k, v in alerted_at.items() if recent(v)},
+            "seen": seen,
+            # How much each source parsed. A count that collapses is the first
+            # sign of a redesign that has not broken parsing outright.
+            "counts": {k: len(current.get(k, [])) for k in ("products", "menu", "cards", "notes")},
+            "last_seen": now_iso,
+        }
+        return new_state, alerts
+
+
 SITE_CLASSES = {
     "typ3": Typ3Site,
     "hempbarn_livingsoil": HempBarnLivingSoilSite,
@@ -1586,6 +2331,7 @@ SITE_CLASSES = {
     "beleafer_indoor": BeleaferIndoorSite,
     "highalpinegenetics": HighAlpineGeneticsSite,
     "antheiafarms": AntheiaFarmsSite,
+    "veritas": VeritasSite,
 }
 
 
@@ -1611,6 +2357,9 @@ def _row(a):
         # A size this shop has never offered before. Rare by design, so give
         # it its own colour rather than letting it read as a routine restock.
         "NEW_VARIANT": "#8e44ad",
+        # VERITAS: rosin/hash buyable in 5 g or less; an exotic ounce.
+        "ROSIN_5G": "#d35400",
+        "EXOTIC_OZ": "#16a085",
     }.get(a["kind"], "#333")
     return (
         '<tr>'
