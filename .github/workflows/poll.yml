@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write   # commit state.json back to main
   actions: write    # dispatch the next loop from handoff.sh
+  issues: write     # open/close the site-down issues that start the troubleshooting routine
 
 # Exactly one loop at a time.
 #
@@ -50,6 +51,9 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+          # monitor.py opens a site-down issue after hours of failure, which
+          # fires the Claude troubleshooting routine; it closes it on recovery.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # 5h30m, inside the 6h job ceiling with room for checkout, setup and
           # handoff. Validated at 300s first: runs 157322-157325 each dispatched
           # their successor cleanly, and a changeover costs ~15s of cadence.

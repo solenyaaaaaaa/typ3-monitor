@@ -70,6 +70,12 @@ DEFAULT_CONFIG = {
     # failures are stored separately from catalog state so they can make the
     # monitor unhealthy without stopping the other sites from being checked.
     "site_failure_threshold": 3,
+    # After this many hours of continuous failure a site gets a GitHub issue,
+    # which starts the Claude troubleshooting routine (see github_api). Six
+    # sits just above Hemp Barn's routine ~5.5 h gaps (one runner's lifetime)
+    # and well below Beleafer's 29-day outage. 0 turns it off; a site's own
+    # config can override it.
+    "site_down_issue_after_hours": 6,
     "typ3": {
         "enabled": True,
         "collection_urls": [
@@ -237,7 +243,7 @@ def record_site_failure(state, site_name, exc, threshold):
     previous = failures.get(site_name, {})
     count = min(int(previous.get("count", 0)) + 1, threshold)
     now_iso = datetime.now(timezone.utc).isoformat()
-    failures[site_name] = {
+    entry = {
         "count": count,
         # Preserved across the streak: `count` is capped at the threshold, so
         # it cannot distinguish "failing for 3 minutes" from "failing for 3
@@ -246,6 +252,11 @@ def record_site_failure(state, site_name, exc, threshold):
         "last_error": str(exc)[:300],
         "last_failed_at": now_iso,
     }
+    # The site-down issue opened for this outage belongs to the whole streak.
+    for key in ("issue", "issue_opened_at"):
+        if previous.get(key):
+            entry[key] = previous[key]
+    failures[site_name] = entry
     return count
 
 
@@ -2575,6 +2586,131 @@ def desktop_alerts(alerts, cfg):
                 logging.warning("browser open failed for %s: %s", a["url"], exc)
 
 
+# ---------- Site down for hours -> GitHub issue -> Claude routine -------
+
+# A site that stays down needs a fix, not a notification. On 2026-10-13 the
+# user asked for a troubleshooter to start on its own instead of an email
+# (Beleafer had sat dark for 29 days because its only signal was a file on
+# the PC). So after `site_down_issue_after_hours` of continuous failure the
+# monitor opens ONE issue per outage with this label. A GitHub webhook on that
+# event fires the Claude routine "Drop monitor: troubleshoot down site", which
+# diagnoses and fixes the scraper in the cloud and reports on the issue. The
+# monitor closes the issue itself once the site polls cleanly again.
+SITE_DOWN_LABEL = "site-down"
+GITHUB_API = "https://api.github.com"
+
+
+def github_api(method, path, payload=None):
+    """Call the GitHub REST API as this workflow run (GITHUB_TOKEN).
+
+    Returns the parsed JSON, or None when not running in Actions or on any
+    error: a GitHub hiccup must never cost a poll. The callers retry on a
+    later run.
+    """
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
+    if not token or not repo:
+        return None
+    url = "%s/repos/%s/%s" % (GITHUB_API, repo, path.lstrip("/"))
+    try:
+        resp = requests.request(method, url, json=payload, timeout=15, headers={
+            "Authorization": "Bearer " + token,
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        })
+        resp.raise_for_status()
+        return resp.json() if resp.content else {}
+    except Exception as exc:
+        logging.warning("GitHub API %s %s failed: %s", method, path, exc)
+        return None
+
+
+def _hours_since(iso, now):
+    try:
+        return (now - datetime.fromisoformat(iso)).total_seconds() / 3600.0
+    except (TypeError, ValueError):
+        return None
+
+
+def _site_down_title_prefix(site_name):
+    return "Site down: %s (" % site_name
+
+
+def open_site_down_issue(site, entry, hours, threshold):
+    """Open the issue for this outage, or adopt one already open (a state
+    push can fail after the issue was created). Returns its number or None."""
+    prefix = _site_down_title_prefix(site.name)
+    for issue in github_api("GET", "issues?state=open&labels=%s&per_page=100"
+                            % SITE_DOWN_LABEL) or []:
+        if (issue.get("title") or "").startswith(prefix):
+            return issue.get("number")
+    urls = sorted({v for v in site.cfg.values()
+                   if isinstance(v, str) and v.startswith("http")})
+    body = "\n".join([
+        "**Site:** `%s` (%s)" % (site.name, site.label),
+        "**Failing since:** %s (%.1f h, threshold %g h)" % (
+            entry.get("first_failed_at"), hours, threshold),
+        "**Last failure:** %s" % entry.get("last_failed_at"),
+        "**Last error:** `%s`" % (entry.get("last_error") or "").replace("`", "'"),
+        "**URLs:** " + (", ".join(urls) or "see config.json"),
+        "",
+        "Opened automatically by monitor.py. This issue starts the Claude routine "
+        "that troubleshoots the site; it reports here. The monitor closes the "
+        "issue when the site polls cleanly again.",
+        "",
+        "Context: PROJECT.md (design invariants and this site's section), "
+        "`health.site_failures` in state.json on main, and the site's block in "
+        "config.json.",
+    ])
+    created = github_api("POST", "issues", {
+        "title": "%s%s) failing %.0f h" % (prefix, site.label, hours),
+        "body": body,
+        "labels": [SITE_DOWN_LABEL],
+    })
+    return (created or {}).get("number")
+
+
+def close_site_down_issue(number, comment):
+    """Comment and close; True when GitHub accepted the close."""
+    github_api("POST", "issues/%s/comments" % number, {"body": comment})
+    return github_api("PATCH", "issues/%s" % number,
+                      {"state": "closed", "state_reason": "completed"}) is not None
+
+
+def file_site_down_issues(persistent_failures, sites, default_hours, now):
+    """Open one issue per site that has failed continuously past its
+    threshold. Mutates the failure entries (they live in state) and returns
+    a summary of what was opened."""
+    opened = []
+    by_name = {site.name: site for site in sites}
+    for name, entry in sorted(persistent_failures.items()):
+        site = by_name.get(name)
+        if site is None or entry.get("issue"):
+            continue
+        threshold = float(site.cfg.get("site_down_issue_after_hours", default_hours))
+        hours = _hours_since(entry.get("first_failed_at"), now)
+        if threshold <= 0 or hours is None or hours < threshold:
+            continue
+        number = open_site_down_issue(site, entry, hours, threshold)
+        if number:
+            entry["issue"] = number
+            entry["issue_opened_at"] = now.isoformat()
+            opened.append("%s #%s" % (name, number))
+    return opened
+
+
+def retry_pending_issue_closes(state):
+    """Close issues whose site recovered on a run where GitHub was down."""
+    health = state.setdefault("health", {})
+    pending = health.get("pending_issue_closes") or []
+    still_open = [n for n in pending if not close_site_down_issue(
+        n, "Recovered. Closing late: the first attempt to close this failed.")]
+    if still_open:
+        health["pending_issue_closes"] = still_open
+    else:
+        health.pop("pending_issue_closes", None)
+
+
 # ---------- Main loop ---------------------------------------------------
 
 def run_test_email():
@@ -2624,6 +2760,8 @@ def main():
     sites = build_sites(cfg)
     state = load_state()
     state.setdefault("sites", {})
+    # Closes that failed on an earlier run (GitHub down when a site recovered).
+    retry_pending_issue_closes(state)
 
     session = requests.Session()
     ua = cfg.get("user_agent", DEFAULT_USER_AGENT)
@@ -2674,6 +2812,14 @@ def main():
             )
             continue
 
+        failure = state.get("health", {}).get("site_failures", {}).get(site.name)
+        if failure and failure.get("issue"):
+            hours = _hours_since(failure.get("first_failed_at"), now_utc) or 0.0
+            comment = ("Recovered: `%s` polled cleanly at %s after %.1f h of failures."
+                       % (site.name, now_utc.isoformat(timespec="seconds"), hours))
+            if not close_site_down_issue(failure["issue"], comment):
+                state.setdefault("health", {}).setdefault(
+                    "pending_issue_closes", []).append(failure["issue"])
         clear_site_failure(state, site.name)
 
         # Record the poll time so the next run can apply throttling.
@@ -2703,6 +2849,14 @@ def main():
         state, failure_threshold, {site.name for site in sites}
     )
     degraded = degraded_site_failures(persistent_failures, degraded_after_minutes)
+
+    # Hours of continuous failure start the troubleshooting routine. GitHub
+    # trouble here is logged and retried next run; it never fails the poll.
+    opened = file_site_down_issues(
+        persistent_failures, sites,
+        float(cfg.get("site_down_issue_after_hours", 6)), datetime.now(timezone.utc))
+    if opened:
+        summary_lines.append("SITE-DOWN ISSUE OPENED: " + ", ".join(opened))
 
     # The Healthchecks check answers exactly ONE question: is the monitor
     # running and able to tell me about a drop? A single flaky STORE is not

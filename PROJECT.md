@@ -264,10 +264,14 @@ you teach someone to ignore the one alert that matters.
 - `monitor.py` exits non-zero only for undelivered email. The poll loop reads
   that exit code, so a broken store must not fail the job.
 
-**Who notices site breakage now:** `triage.py` plus the `drop-monitor-triage`
-scheduled task (every 4h, silent when healthy) - see SYSTEM-MODS.md. Decoupling
-without that replacement would recreate the silent-failure problem that hid High
-Alpine for 82 days. Do not remove one without the other.
+**Who notices site breakage now:** since 2026-10-13, the monitor itself: after
+6 hours down it opens a `site-down` issue that starts the Claude troubleshooting
+routine (see "Auto-troubleshooting" below). The local `triage.py` /
+`DropMonitorWatchdog` (every 30 min, see SYSTEM-MODS.md; the `drop-monitor-triage`
+Claude task it replaced was deleted 2026-09-11) still restarts a dead loop and
+catches sites that go stale without raising. Decoupling without a replacement
+would recreate the silent-failure problem that hid High Alpine for 82 days. Do
+not remove one without the other.
 
 **Beleafer's 29-day outage was a stale fingerprint, not an IP block
 (fixed 2026-10-13).** From 2026-09-14 06:50 UTC every request 403'd,
@@ -290,6 +294,16 @@ chrome133a and chrome136 all got 403 while chrome142+, safari and firefox got
   15-minute check would have saved 29 days.
 - It also flapped on runner IPs before September; the 12h escalation window
   stays until it has held clean for a while.
+
+## Auto-troubleshooting: site-down issue starts a Claude routine (2026-10-13)
+
+The user wants a site that stays down fixed, not reported: no email, a troubleshooter that starts on its own. History says why. Beleafer sat dark for 29 days with its only signal a file on the PC, and an earlier local Claude scheduled task (2026-09-10) was deleted a day later because a session on the PC kept stopping for permission prompts.
+
+- **Detection (monitor.py, cloud):** after `site_down_issue_after_hours` (6) of continuous failure, `file_site_down_issues` opens ONE GitHub issue per outage, labelled `site-down`, titled `Site down: <site> (<label>) failing N h`, with first/last failure, last error and URLs. The issue number rides on `health.site_failures.<site>.issue`, survives further failures, and an already-open issue for the site is adopted instead of duplicated. When the site next polls cleanly the monitor comments and closes it; a close that fails is retried from `health.pending_issue_closes`. Six hours sits above Hemp Barn's routine ~5.5 h gaps (one runner's lifetime) and far below Beleafer's 29 days; per-site override `site_down_issue_after_hours`, 0 = off. Needs `issues: write` and `GITHUB_TOKEN` in poll.yml. GitHub trouble is logged and never fails a poll.
+- **Trigger:** a claude.ai webhook trigger fires on GitHub `issues.opened` in this repo (any issue: the trigger filter's schema is undocumented, and only the monitor opens issues here). It needs the Claude GitHub App installed on the repo.
+- **Routine:** "Drop monitor: troubleshoot down site", `trig_01CAWb2DjAa6wBSo5u5TqHZL`, https://claude.ai/code/routines/trig_01CAWb2DjAa6wBSo5u5TqHZL. Runs in Anthropic's cloud on Opus with only this repo (all account connectors deliberately removed: it reads untrusted store pages, so it gets no Gmail/Drive/Calendar). Its prompt: find the down site from `health.site_failures` and open `site-down` issues, reproduce without ever running `main()`, fix fetching/parsing only (never alert rules), verify live plus a diff against the saved state plus the tests, push to main, note the incident here, and report on the issue. If nothing is down 6+ hours it says so and stops.
+- **Cost:** nothing until an issue opens. The last 35 days would have produced about 7 runs, mostly Beleafer's now-fixed fingerprint problem.
+- **To change it:** edit the prompt or pause it at the link above (routines cannot be deleted through the API, only in that UI). A dead webhook trigger for the event name `bogus.event`, left by schema probing during setup, can never fire; remove it in the same UI if it shows.
 
 ## VERITAS (2026-10-13)
 
