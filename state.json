@@ -18,7 +18,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:32:06.863394+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "truffle-monkey-rosin": {
           "handle": "truffle-monkey-rosin",
@@ -27,7 +27,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:32:06.863394+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "bluezerry-live-resin": {
           "handle": "bluezerry-live-resin",
@@ -36,7 +36,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:32:06.863394+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "marshmellow-og-live-resin": {
           "handle": "marshmellow-og-live-resin",
@@ -45,7 +45,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:32:06.863394+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "june-plum-disposable": {
           "handle": "june-plum-disposable",
@@ -54,7 +54,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:35:38.247025+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "bruntz-disposable": {
           "handle": "bruntz-disposable",
@@ -63,7 +63,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:35:38.247025+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "tropruntz-510-cart": {
           "handle": "tropruntz-510-cart",
@@ -72,7 +72,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:35:38.247025+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "permanent-marker-510-cart": {
           "handle": "permanent-marker-510-cart",
@@ -81,7 +81,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:35:38.247025+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "bluezerry-honey": {
           "handle": "bluezerry-honey",
@@ -90,7 +90,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:35:38.247025+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "marshmellow-og-tincture": {
           "handle": "marshmellow-og-tincture",
@@ -99,7 +99,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:35:38.247025+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "june-plum-chocolate": {
           "handle": "june-plum-chocolate",
@@ -108,7 +108,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:35:38.247025+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "bruntz-gummies": {
           "handle": "bruntz-gummies",
@@ -117,7 +117,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:35:38.247025+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "tropruntz-gummies": {
           "handle": "tropruntz-gummies",
@@ -126,7 +126,7 @@
           "sold_out": true,
           "made_to_order": false,
           "first_seen": "2026-05-14T18:37:17.659043+00:00",
-          "last_seen": "2026-10-15T17:35:38.247025+00:00"
+          "last_seen": "2026-10-15T17:38:12.236174+00:00"
         },
         "truffle-monkey": {
           "handle": "truffle-monkey",
@@ -183,7 +183,7 @@
           "last_seen": "2026-10-15T17:32:06.863394+00:00"
         }
       },
-      "last_polled_at": "2026-10-15T17:36:01.403069+00:00"
+      "last_polled_at": "2026-10-15T17:37:45.248495+00:00"
     },
     "hempbarn_livingsoil": {
       "strains": [
@@ -260,8 +260,8 @@
         "Headband",
         "Sherb Star"
       ],
-      "last_seen": "2026-10-15T17:37:42.360522+00:00",
-      "last_polled_at": "2026-10-15T17:36:01.403069+00:00"
+      "last_seen": "2026-10-15T17:38:12.457050+00:00",
+      "last_polled_at": "2026-10-15T17:37:45.248495+00:00"
     },
     "caregiverpharms": {
       "products": {
@@ -370,8 +370,8 @@
         "1/4 oz (7 grams)",
         "1/8 oz (3.5 grams)"
       ],
-      "last_seen": "2026-10-15T17:37:42.654085+00:00",
-      "last_polled_at": "2026-10-15T17:36:01.403069+00:00"
+      "last_seen": "2026-10-15T17:38:12.743042+00:00",
+      "last_polled_at": "2026-10-15T17:37:45.248495+00:00"
     },
     "flowgardens_smalls": {
       "products": {
@@ -460,8 +460,8 @@
           ]
         }
       },
-      "last_seen": "2026-10-15T17:37:42.932686+00:00",
-      "last_polled_at": "2026-10-15T17:36:01.403069+00:00"
+      "last_seen": "2026-10-15T17:38:13.180944+00:00",
+      "last_polled_at": "2026-10-15T17:37:45.248495+00:00"
     },
     "hempbarn_organicsoil": {
       "strains": [
@@ -543,8 +543,8 @@
         "Neon",
         "Tamalez"
       ],
-      "last_seen": "2026-10-15T17:37:42.513002+00:00",
-      "last_polled_at": "2026-10-15T17:36:01.403069+00:00"
+      "last_seen": "2026-10-15T17:38:12.603558+00:00",
+      "last_polled_at": "2026-10-15T17:37:45.248495+00:00"
     },
     "fiveleafwellness": {
       "alerted": [
@@ -559,8 +559,8 @@
         "sour-garlic-cookies-indoor-hybrid",
         "super-boof-indoor-hybrid-2"
       ],
-      "last_seen": "2026-10-15T17:37:42.977202+00:00",
-      "last_polled_at": "2026-10-15T17:36:01.403069+00:00"
+      "last_seen": "2026-10-15T17:38:13.229673+00:00",
+      "last_polled_at": "2026-10-15T17:37:45.248495+00:00"
     },
     "beleafer_indoor": {
       "v": 2,
@@ -2141,8 +2141,8 @@
           }
         }
       },
-      "last_seen": "2026-10-15T17:37:43.192314+00:00",
-      "last_polled_at": "2026-10-15T17:36:01.403069+00:00"
+      "last_seen": "2026-10-15T17:38:13.383254+00:00",
+      "last_polled_at": "2026-10-15T17:37:45.248495+00:00"
     },
     "veritas": {
       "v": 1,
@@ -2159,11 +2159,11 @@
       "last_polled_at": "2026-10-15T17:34:46.750337+00:00"
     }
   },
-  "last_run": "2026-10-15T17:37:43.192381+00:00",
+  "last_run": "2026-10-15T17:38:13.383331+00:00",
   "health": {
     "site_failures": {},
     "unhealthy": false,
     "degraded_sites": [],
-    "checked_at": "2026-10-15T17:37:43.192378+00:00"
+    "checked_at": "2026-10-15T17:38:13.383327+00:00"
   }
 }
