@@ -1702,7 +1702,11 @@ class VeritasSite:
                   "short_description,description,prices")
 
     # ---- page structure (Elementor) ----
-    PRICE_LIST_RE = re.compile(r'class="elementor-price-list-item"')
+    # The page's own Elementor document. Present on every real copy of the
+    # page whatever its layout; absent from a 429 or challenge page. Was the
+    # price-list item class until 2026-11-16, when the vendor removed every
+    # price-list line (see fetch).
+    PAGE_DOC_RE = re.compile(r'data-elementor-type="wp-page"')
     LI_RE = re.compile(r"<li\b([^>]*)>(.*?)</li>", re.DOTALL | re.IGNORECASE)
     TITLE_RE = re.compile(r'elementor-price-list-title"[^>]*>(.*?)</span>', re.DOTALL)
     PRICE_RE = re.compile(r'elementor-price-list-price"[^>]*>(.*?)</span>', re.DOTALL)
@@ -1863,14 +1867,23 @@ class VeritasSite:
 
     def fetch(self, session, ua, timeout):
         resp = http_get(session, self.menu_url, ua, timeout,
-                        expect_pattern=self.PRICE_LIST_RE)
+                        expect_pattern=self.PAGE_DOC_RE)
         menu, cards, notes = self._parse_menu(resp.text)
-        if not menu:
-            # The page has been an Elementor price list since at least
-            # 2026-10-13. Nothing parsed means the markup or the URL changed;
+        if not (menu or cards or notes):
+            # Nothing at all from the page means the markup or the URL changed;
             # raise so the health counter sees it instead of a quiet page.
-            raise RuntimeError("no price-list items parsed from %s; menu markup may "
-                               "have changed" % self.menu_url)
+            # Price-list lines alone are NOT required: on 2026-11-16 the vendor
+            # rewrote the page for a "Green Friday" sale, removed every
+            # price-list line (one empty <ul> left) and moved the same items
+            # into text blocks, which parse as notes. Requiring price-list
+            # lines kept this site dark for 6 h while 60 cards and 77 notes
+            # parsed fine.
+            raise RuntimeError("nothing parsed from %s (no price-list lines, update "
+                               "cards or notes); menu markup may have changed"
+                               % self.menu_url)
+        if not menu:
+            logging.info("[%s] no price-list lines on the menu page; using %d update "
+                         "cards and %d notes", self.name, len(cards), len(notes))
         time.sleep(1.5)  # spacing for the rate limit; see _fetch_products
         products = self._fetch_products(session, ua, timeout)
         snapshot = {"products": products, "menu": menu, "cards": cards, "notes": notes}

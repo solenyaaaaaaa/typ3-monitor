@@ -318,6 +318,37 @@ class FetchFailureTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.site.fetch(None, "ua", 1)
 
+    def test_page_without_price_list_lines_still_polls(self):
+        # 2026-11-16 "Green Friday" layout: every price-list line removed (one
+        # empty <ul> left), the items moved into text blocks. Requiring
+        # price-list lines kept the site dark for 6 h.
+        page = """
+<html><body>
+<div data-elementor-type="wp-page" data-elementor-id="9189">
+ <div class="elementor-element elementor-widget elementor-widget-text-editor" data-widget_type="text-editor.default">
+  <div class="elementor-widget-container"><p>VERITAS GREEN FRIDAY SALE</p>
+   <p>OC Tier 3 Inventory Ridgeline Rose – Tier 3 – 30g available</p></div></div>
+ <div class="elementor-element elementor-widget elementor-widget-price-list" data-widget_type="price-list.default">
+  <div class="elementor-widget-container">
+   <ul class="elementor-price-list">
+   </ul></div></div>
+</div>
+<div data-elementor-type="footer" data-elementor-id="3184"></div></body></html>
+"""
+        self.assertTrue(monitor.VeritasSite.PAGE_DOC_RE.search(page))
+        self.assertFalse(monitor.VeritasSite.PAGE_DOC_RE.search(
+            "<html><head><title>429 Too Many Requests</title></head></html>"))
+        api = FakeResponse(data=[{"id": 1, "name": "Tier 3 Rosin - Madd Peach",
+                                  "categories": [{"slug": "rosin"}], "is_in_stock": True}],
+                           headers={"X-WP-TotalPages": "1"})
+        with patch.object(monitor, "http_get", side_effect=[FakeResponse(page), api]) as get, \
+             patch.object(monitor.time, "sleep"):
+            snap = self.site.fetch(None, "ua", 1)
+        self.assertEqual(snap["menu"], [])
+        self.assertTrue(any("Ridgeline Rose" in n["title"] for n in snap["notes"]))
+        self.assertEqual(len(snap["products"]), 1)
+        self.assertIs(get.call_args_list[0][1]["expect_pattern"], monitor.VeritasSite.PAGE_DOC_RE)
+
     def test_empty_catalog_raises(self):
         responses = [FakeResponse(PAGE), FakeResponse(data=[], headers={"X-WP-TotalPages": "1"})]
         with patch.object(monitor, "http_get", side_effect=responses) as get, \
