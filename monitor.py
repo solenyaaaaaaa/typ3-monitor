@@ -760,7 +760,70 @@ class HempBarnSite:
                 descs[strain] = text
         return descs
 
+    def _store_api_url(self):
+        """WooCommerce Store API query for this product, derived from the
+        product URL (https://host/product/<slug>/), or `store_api_url`."""
+        if self.cfg.get("store_api_url"):
+            return self.cfg["store_api_url"]
+        parts = self.cfg["url"].split("/")
+        slug = [p for p in parts[3:] if p][-1]
+        return "%s//%s/wp-json/wc/store/v1/products?slug=%s" % (
+            parts[0], parts[2], slug)
+
+    def _fetch_store_api(self, session, ua, timeout):
+        """Same snapshot as the product page, read from the Store API.
+
+        Strains come from each variation's Strain attribute (what the page's
+        data-product_variations carried) and descriptions from
+        `short_description`, which is the exact HTML of the page's
+        short-description block, so the chunking below is unchanged.
+        Verified 2026-11-19 on both products: identical variations, strains
+        and parsed descriptions to the page.
+        """
+        resp = http_get(session, self._store_api_url(), ua, timeout,
+                        expect_json=True)
+        products = resp.json()
+        if not isinstance(products, list) or not products:
+            raise RuntimeError("Store API returned no product for %s"
+                               % self._store_api_url())
+        product = products[0]
+        if "variations" not in product or "short_description" not in product:
+            raise RuntimeError("Store API product lacks variations/short_description")
+        strains = set()
+        for v in product.get("variations") or []:
+            for attr in v.get("attributes") or []:
+                if (attr.get("name") or "").strip().lower() in ("strain", "pa_strain"):
+                    value = (attr.get("value") or "").strip()
+                    if value:
+                        strains.add(value)
+        strains = sorted(strains)
+        block = ('<div class="woocommerce-product-details__short-description">'
+                 + (product.get("short_description") or "") + "</div>")
+        return {"strains": strains,
+                "descriptions": self._extract_descriptions(block, strains)}
+
     def fetch(self, session, ua, timeout):
+        # Store API first, product page as fallback (2026-11-19). From
+        # 16:21 UTC that day the product pages sat behind SiteGround's
+        # "One moment, please..." JS bot check: GitHub runners got 403 on
+        # every request (all impersonated fingerprints included) and a
+        # datacenter sandbox got the challenge page under a 200 to every
+        # client but Safari, so both sites went dark. The public Store API
+        # was not gated and carries the same variations and description
+        # HTML. A failure of both raises, so health tracking still sees it.
+        try:
+            return self._fetch_store_api(session, ua, timeout)
+        except Exception as api_exc:
+            logging.info("%s: Store API failed (%s); trying product page",
+                         self.name, api_exc)
+            try:
+                return self._fetch_page(session, ua, timeout)
+            except Exception as page_exc:
+                # Name both, so last_error in state.json shows each path.
+                raise RuntimeError("Store API: %s; product page: %s"
+                                   % (api_exc, page_exc)) from page_exc
+
+    def _fetch_page(self, session, ua, timeout):
         # expect_pattern: the product page is worthless without the variations
         # JSON, and a WAF can withhold it under a 200. Declaring what the page
         # must contain lets http_get retry with a browser fingerprint instead
